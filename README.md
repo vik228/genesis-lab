@@ -1,7 +1,6 @@
 # 🌌 Genesis Lab: Core Generative AI Research
 
-A unified, research-grade codebase to **implement, reproduce, and extend** seminal Generative‑AI papers.
-Start here with *Attention Is All You Need* (2017), then grow toward GPT‑2, BERT, LoRA, QLoRA, MoE, and Diffusion.
+A unified, research-grade codebase tracing the full evolution from classical NLP to modern LLMs — implementing seminal papers from first principles. Covers n-gram models → neural embeddings (Word2Vec, GloVe) → subword tokenization (BPE) → sequence modeling (LSTM, Seq2Seq, Attention) → Transformers → the pretrain→finetune paradigm (GPT, ELMo, BERT) → scaling laws (Chinchilla) → efficiency (FlashAttention, MoE, LoRA) → alignment (RLHF, DPO) → reasoning (CoT, test-time compute). Each implementation uses Shape-Driven Development with explicit tensor dimension tracking.
 
 ## Structure
 - `papers/<paper_name>/` – Self-contained implementations per paper
