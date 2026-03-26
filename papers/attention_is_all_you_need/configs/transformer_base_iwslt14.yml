@@ -1,0 +1,35 @@
+seed: 1337
+task: "mt_de_en"
+dataset:
+  name: "iwslt14_de_en"
+  vocab_size: 8000
+  max_len: 128
+  batch_tokens: 4096
+  num_workers: 4
+model:
+  d_model: 512
+  n_heads: 8
+  d_ff: 2048
+  n_layers_enc: 6
+  n_layers_dec: 6
+  dropout: 0.1
+  tie_weights: true
+train:
+  epochs: 40
+  label_smoothing: 0.1
+  optimizer:
+    type: "adam"
+    beta1: 0.9
+    beta2: 0.98
+    eps: 1.0e-9
+  lr:
+    type: "noam"
+    base_lr: 1.0
+    warmup_steps: 4000
+log:
+  wandb: true
+  project: "genesis-lab"
+eval:
+  beam_size: 4
+  max_len_a: 1.2
+  max_len_b: 10
