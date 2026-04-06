@@ -13,3 +13,4 @@ data/**
 experiments/**
 !experiments/README.md
 reports/charts/**
+.DS_Store

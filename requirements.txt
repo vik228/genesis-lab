@@ -9,3 +9,6 @@ sacrebleu
 wandb
 matplotlib
 bitsandbytes
+datasets
+pre-commit
+black
