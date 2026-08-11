@@ -14,3 +14,12 @@ experiments/**
 !experiments/README.md
 reports/charts/**
 .DS_Store
+.vscode/
+
+# scratch tooling and generated output (decided 2026-07-29: not part of the repo)
+edit_nb.py
+edit_nb2.py
+extract.py
+test_gpu_run.py
+test_notebook.py
+losses.png
