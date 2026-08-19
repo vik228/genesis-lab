@@ -12,6 +12,7 @@ later runs start training in seconds instead of rebuilding the tree.
 
 import argparse
 import heapq
+import itertools
 import json
 import math
 import random
@@ -304,10 +305,27 @@ def main():
     ap.add_argument("--seed", type=int, default=42)
     ap.add_argument("--no-decay", action="store_true")
     ap.add_argument(
+        "--subsample",
+        type=float,
+        default=0.0,
+        help="word2vec's frequent-word subsampling threshold t (1e-5 to match "
+        "the paper, 0 = off). Applied to the training stream only - the vocab "
+        "and the huffman tree stay on the original counts.",
+    )
+    ap.add_argument(
         "--max-exp",
         type=float,
         default=0.0,
         help="word2vec.c MAX_EXP logit cutoff (6.0 to match it, 0 = off)",
+    )
+    ap.add_argument(
+        "--resume",
+        action="store_true",
+        help="pick up from --out's latest.pt: restores the weights, the step "
+        "counter and the lr schedule, and keeps going to --max-steps. The "
+        "remaining passes redraw their own subsample, so the token order "
+        "differs from an uninterrupted run - the update count and the lr "
+        "curve do not.",
     )
     ap.add_argument("--out", default="")
     args = ap.parse_args()
@@ -336,16 +354,33 @@ def main():
 
     if args.kind == "skipgram":
         model = SkipGram(V, args.emb_dim, paths, codes, masks, args.max_exp)
-        dataset = SkipGramDataset(stream, args.window)
         # E[pairs per center] = E[2*radius] = 2*mean(1..window); an estimate,
         # used only to shape the lr decay
         examples = n * (args.window + 1)
     else:
         model = CBOW(V, args.emb_dim, paths, codes, masks, args.window, args.max_exp)
-        dataset = CBOWDataset(stream, args.window)
         examples = n
     model.to(device)
-    loader = DataLoader(dataset, batch_size=args.batch_size)
+
+    # Subsampling keeps each occurrence with probability sqrt(t/f), so the
+    # frequency that survives is sqrt(t*f) - frequent words are thinned hard,
+    # rare ones untouched. Drawn per token per pass rather than once, because
+    # word2vec subsamples on the fly while reading: every pass keeps a
+    # different set of `the`s, so repeated passes are not repeated data.
+    keep_p = None
+    if args.subsample > 0:
+        freq = np.bincount(stream, minlength=V) / n
+        keep_p = np.minimum(1.0, np.sqrt(args.subsample / np.maximum(freq, 1e-12)))
+        examples = int(examples * float((freq * keep_p).sum()))
+    sub_rng = np.random.default_rng(args.seed)
+
+    def epoch_loader():
+        s = stream
+        if keep_p is not None:
+            s = stream[sub_rng.random(n, dtype=np.float32) < keep_p[stream]]
+            log(f"subsampled stream {len(s)} of {n} ({100*len(s)/n:.1f}%)")
+        cls = SkipGramDataset if args.kind == "skipgram" else CBOWDataset
+        return DataLoader(cls(s, args.window), batch_size=args.batch_size)
 
     steps_per_epoch = examples // args.batch_size
     total_steps = args.max_steps or steps_per_epoch * args.epochs
@@ -366,6 +401,32 @@ def main():
     step = 0
     win_obs = win_diff = 0.0
     win_n = 0
+
+    if args.resume:
+        ckpt = torch.load(out / "latest.pt", map_location=device)
+        if ckpt["kind"] != args.kind:
+            sys.exit(f"checkpoint is {ckpt['kind']}, not {args.kind}")
+        want = {"word_emb.weight", "node_emb.weight"}
+        if want - set(ckpt["state_dict"]):
+            sys.exit(f"checkpoint is missing {want - set(ckpt['state_dict'])}")
+        # strict=False because dump() saves only the two embedding tables;
+        # the huffman path/code/mask buffers are rebuilt from the cache
+        model.load_state_dict(ckpt["state_dict"], strict=False)
+        step = int(ckpt["step"])
+        if scheduler is not None:
+            # LambdaLR reads last_epoch, so fast-forward it rather than
+            # calling step() four million times
+            scheduler.last_epoch = step - 1
+            scheduler.step()
+        tr = np.load(out / "traces.npz")
+        observed, predicted = list(tr["observed"]), list(tr["predicted"])
+        log(
+            f"resumed from step {step} ({100*step/total_steps:.1f}%), "
+            f"lr {optimizer.param_groups[0]['lr']:.4f}, "
+            f"{len(observed)} trace points"
+        )
+
+    start_step = step
     t0 = time.perf_counter()
 
     def dump(tag):
@@ -391,9 +452,16 @@ def main():
         for line in neighbours(model, word_to_idx, idx_to_word):
             log(f"  nn  {line}")
 
+    # a resumed run has already burnt some of its epochs, and how many is not
+    # recoverable from the checkpoint, so let it draw fresh passes until the
+    # step budget is spent - --max-steps is the real bound either way
+    epochs = itertools.count() if args.resume else range(args.epochs)
+
     try:
-        for epoch in range(args.epochs):
-            for batch in loader:
+        for epoch in epochs:
+            if step >= total_steps:
+                break
+            for batch in epoch_loader():
                 if step >= total_steps:
                     break
                 if args.kind == "skipgram":
@@ -442,7 +510,7 @@ def main():
 
                 if step % args.log_every == 0:
                     el = time.perf_counter() - t0
-                    rate = step / el
+                    rate = (step - start_step) / el
                     eta = (total_steps - step) / rate / 3600
                     md = win_diff / win_n
                     with torch.no_grad():
