@@ -1,6 +1,6 @@
 """Standalone word2vec trainer - skip-gram or CBOW with a hierarchical-softmax head.
 
-Lifted from notebooks/miklov-2013a.ipynb so a full-epoch run does not depend on a
+Lifted from notebooks/mikolov-2013a.ipynb so a full-epoch run does not depend on a
 live Jupyter kernel. Same vocab, same Huffman tree, same modules, same masked BCE.
 
   python scripts/train_word2vec.py --kind skipgram --lr 4 --batch-size 16
