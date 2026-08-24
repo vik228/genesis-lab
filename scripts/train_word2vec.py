@@ -207,11 +207,100 @@ class CBOWDataset(IterableDataset):
 
 
 # ---------------------------------------------------------------------- models
+NOISE_POWER = 0.75
+NOISE_TABLE_SIZE = 10_000_000
+
+
+class NSHead(nn.Module):
+    """Shared negative-sampling head, drop-in for HSHead: same score(h, targets)
+    contract, where `targets` is the (B,) true word. The k noise words are drawn
+    inside score(), so SkipGram and CBOW are identical code under either head.
+
+    Softmax's denominator did the work of pushing every other word down. NS
+    deletes the denominator, so that pressure has to be supplied explicitly -
+    that is all the negatives are.
+    """
+
+    CKPT_KEYS = ("word_emb.weight", "out_emb.weight")
+
+    def __init__(
+        self, vocab_size, emb_dim, counts, num_neg=5, max_exp=0.0, sparse=False
+    ):
+        super().__init__()
+        self.vocab_size, self.emb_dim = vocab_size, emb_dim
+        self.num_neg = num_neg
+        self.max_exp = float(max_exp)
+        # named word_emb, not in_emb, so eval_word2vec.py / analyze_freq_buckets.py
+        # / neighbours() / the checkpoint format all keep working unchanged
+        self.word_emb = nn.Embedding(vocab_size, emb_dim, sparse=sparse)
+        self.out_emb = nn.Embedding(vocab_size, emb_dim, sparse=sparse)
+        bound = 0.5 / emb_dim
+        nn.init.uniform_(self.word_emb.weight, -bound, bound)
+        # word2vec.c starts syn1neg at zero, same as syn1 in the HS build. With
+        # every dot product at 0 the init loss is (k+1) * ln2 - the NS analogue
+        # of the 7.38 checkpoint.
+        nn.init.zeros_(self.out_emb.weight)
+        # Constant [1, 0, ..., 0], kept as (1, k+1) and expanded per batch in
+        # score(). binary_cross_entropy_with_logits requires target and input to
+        # match exactly; it does not broadcast.
+        labels = torch.zeros(1, num_neg + 1)
+        labels[0, 0] = 1.0
+        self.register_buffer("labels", labels)
+        # Noise distribution U(w)^0.75, pre-expanded into a lookup table exactly
+        # like word2vec.c: each word occupies a slice of the table proportional
+        # to its noise probability, so a draw is one randint plus one gather,
+        # constant time and no per-draw normalisation.
+        probs = np.asarray(counts, dtype=np.float64) ** NOISE_POWER
+        probs /= probs.sum()
+        edges = np.arange(NOISE_TABLE_SIZE, dtype=np.float64) / NOISE_TABLE_SIZE
+        table = np.searchsorted(np.cumsum(probs), edges).astype(np.int64)
+        np.clip(table, 0, vocab_size - 1, out=table)
+        # persistent=False keeps 10M ints out of every checkpoint
+        self.register_buffer("noise_table", torch.from_numpy(table), persistent=False)
+
+    @property
+    def out_table(self):
+        return self.out_emb
+
+    def sample_negatives(self, batch):
+        idx = torch.randint(
+            0,
+            self.noise_table.numel(),
+            (batch, self.num_neg),
+            device=self.noise_table.device,
+        )
+        return self.noise_table[idx]
+
+    def score(self, h, targets):
+        B, K = h.shape[0], self.num_neg + 1
+        # column 0 is the true word, 1..k are noise. word2vec.c does not check
+        # whether a negative collides with the true word either - at V = 71,290
+        # it happens on well under 1% of draws and costs one slot of signal.
+        targets = torch.cat([targets.view(B, 1), self.sample_negatives(B)], dim=1)
+        assert targets.shape == (B, K), targets.shape
+        target_vecs = self.out_emb(targets)
+        assert target_vecs.shape == (B, K, self.emb_dim), target_vecs.shape
+        # the unsqueeze goes on h, the tensor missing the slot axis - never on
+        # the one that already has it
+        logits = (target_vecs * h.unsqueeze(1)).sum(dim=-1)
+        assert logits.shape == (B, K), logits.shape
+        if self.max_exp:
+            logits = logits.clamp(-self.max_exp, self.max_exp)
+        per_slot = F.binary_cross_entropy_with_logits(
+            logits, self.labels.expand_as(logits), reduction="none"
+        )
+        return per_slot.sum(dim=1).mean()
+
+
 class HSHead(nn.Module):
     """Shared hierarchical-softmax head. Both models reduce to: build an (B, D)
     projection h, then score it against the target word's huffman path."""
 
-    def __init__(self, vocab_size, emb_dim, paths, codes, masks, max_exp=0.0):
+    CKPT_KEYS = ("word_emb.weight", "node_emb.weight")
+
+    def __init__(
+        self, vocab_size, emb_dim, paths, codes, masks, max_exp=0.0, sparse=False
+    ):
         super().__init__()
         self.vocab_size, self.emb_dim = vocab_size, emb_dim
         # word2vec.c skips any node whose logit falls outside [-MAX_EXP, MAX_EXP]
@@ -219,14 +308,18 @@ class HSHead(nn.Module):
         # bounded AND the gradient is zero outside the range, so an out-of-range
         # node contributes no update to either word_emb or node_emb. 0 = off.
         self.max_exp = float(max_exp)
-        self.word_emb = nn.Embedding(vocab_size, emb_dim)
-        self.node_emb = nn.Embedding(vocab_size - 1, emb_dim)
+        self.word_emb = nn.Embedding(vocab_size, emb_dim, sparse=sparse)
+        self.node_emb = nn.Embedding(vocab_size - 1, emb_dim, sparse=sparse)
         bound = 0.5 / emb_dim
         nn.init.uniform_(self.word_emb.weight, -bound, bound)
         nn.init.zeros_(self.node_emb.weight)
         self.register_buffer("paths", paths)
         self.register_buffer("codes", codes)
         self.register_buffer("masks", masks)
+
+    @property
+    def out_table(self):
+        return self.node_emb
 
     def score(self, h, targets):
         node_vecs = self.node_emb(self.paths[targets])
@@ -243,7 +336,9 @@ class HSHead(nn.Module):
         return (per_node * mask).sum(dim=1).mean()
 
 
-class SkipGram(HSHead):
+class SkipGramMixin:
+    """Projection only. The head owns everything after h."""
+
     def forward(self, centers, targets):
         centers, targets = centers.long(), targets.long()
         h = self.word_emb(centers)
@@ -251,12 +346,8 @@ class SkipGram(HSHead):
         return self.score(h, targets)
 
 
-class CBOW(HSHead):
-    def __init__(
-        self, vocab_size, emb_dim, paths, codes, masks, max_window_size, max_exp=0.0
-    ):
-        super().__init__(vocab_size, emb_dim, paths, codes, masks, max_exp)
-        self.input_len = 2 * max_window_size
+class CBOWMixin:
+    input_len = None  # set by the caller to 2 * window
 
     def forward(self, contexts, targets, context_mask):
         # `targets` here are the CENTER words - same head, opposite direction
@@ -271,6 +362,26 @@ class CBOW(HSHead):
         )
         assert h.shape == (batch, self.emb_dim)
         return self.score(h, targets)
+
+
+class SkipGramHS(SkipGramMixin, HSHead):
+    pass
+
+
+class CBOWHS(CBOWMixin, HSHead):
+    pass
+
+
+class SkipGramNS(SkipGramMixin, NSHead):
+    pass
+
+
+class CBOWNS(CBOWMixin, NSHead):
+    pass
+
+
+# the HS pair kept their original names for anything that imports them
+SkipGram, CBOW = SkipGramHS, CBOWHS
 
 
 # -------------------------------------------------------------------- training
@@ -298,6 +409,18 @@ def main():
     ap.add_argument("--batch-size", type=int, default=16)
     ap.add_argument("--emb-dim", type=int, default=100)
     ap.add_argument("--window", type=int, default=5)
+    ap.add_argument(
+        "--head",
+        choices=["hs", "ns"],
+        default="hs",
+        help="output layer: hierarchical softmax (2013a) or negative sampling (2013b)",
+    )
+    ap.add_argument(
+        "--num-neg",
+        type=int,
+        default=5,
+        help="k, negatives per positive. The paper suggests 5-20 for small data.",
+    )
     ap.add_argument("--epochs", type=int, default=1)
     ap.add_argument("--max-steps", type=int, default=0, help="0 = one full epoch")
     ap.add_argument("--checkpoint-every", type=int, default=50_000)
@@ -327,6 +450,11 @@ def main():
         "differs from an uninterrupted run - the update count and the lr "
         "curve do not.",
     )
+    ap.add_argument(
+        "--sparse",
+        action="store_true",
+        help="If specified the backward propagation will only work for the active rows",
+    )
     ap.add_argument("--out", default="")
     args = ap.parse_args()
 
@@ -352,13 +480,21 @@ def main():
     random.seed(args.seed)
     torch.manual_seed(args.seed)
 
-    if args.kind == "skipgram":
-        model = SkipGram(V, args.emb_dim, paths, codes, masks, args.max_exp)
+    skipgram = args.kind == "skipgram"
+    if args.head == "ns":
+        counts = np.bincount(stream, minlength=V)
+        cls = SkipGramNS if skipgram else CBOWNS
+        model = cls(V, args.emb_dim, counts, args.num_neg, args.max_exp, args.sparse)
+    else:
+        cls = SkipGramHS if skipgram else CBOWHS
+        model = cls(V, args.emb_dim, paths, codes, masks, args.max_exp, args.sparse)
+    if not skipgram:
+        model.input_len = 2 * args.window
+    if skipgram:
         # E[pairs per center] = E[2*radius] = 2*mean(1..window); an estimate,
         # used only to shape the lr decay
         examples = n * (args.window + 1)
     else:
-        model = CBOW(V, args.emb_dim, paths, codes, masks, args.window, args.max_exp)
         examples = n
     model.to(device)
 
@@ -406,7 +542,7 @@ def main():
         ckpt = torch.load(out / "latest.pt", map_location=device)
         if ckpt["kind"] != args.kind:
             sys.exit(f"checkpoint is {ckpt['kind']}, not {args.kind}")
-        want = {"word_emb.weight", "node_emb.weight"}
+        want = set(model.CKPT_KEYS)
         if want - set(ckpt["state_dict"]):
             sys.exit(f"checkpoint is missing {want - set(ckpt['state_dict'])}")
         # strict=False because dump() saves only the two embedding tables;
@@ -443,7 +579,7 @@ def main():
                 "state_dict": {
                     k: v.cpu()
                     for k, v in model.state_dict().items()
-                    if k in ("word_emb.weight", "node_emb.weight")
+                    if k in model.CKPT_KEYS
                 },
             },
             out / "latest.pt",
@@ -477,8 +613,14 @@ def main():
                         cmask.to(device),
                     )
 
-                # zero-learning baseline: this batch's avg huffman depth * ln2
-                pred = masks[hs_target].sum(dim=1).mean().item() * LN2
+                # zero-learning baseline. HS: this batch's avg huffman depth
+                # * ln2. NS: every logit at 0, so (k+1) sigmoids at 0.5 - a
+                # constant, since there is no per-word path length any more.
+                pred = (
+                    (args.num_neg + 1) * LN2
+                    if args.head == "ns"
+                    else masks[hs_target].sum(dim=1).mean().item() * LN2
+                )
                 loss = model(*fwd)
                 lv = loss.item()
 
@@ -515,7 +657,7 @@ def main():
                     md = win_diff / win_n
                     with torch.no_grad():
                         wn = model.word_emb.weight.norm(dim=1).mean().item()
-                        nn_ = model.node_emb.weight.norm(dim=1).mean().item()
+                        nn_ = model.out_table.weight.norm(dim=1).mean().item()
                     # a positive window diff means the model is now doing worse
                     # than predicting nothing - it precedes the actual overflow
                     # by tens of thousands of steps and is the signal to act on
