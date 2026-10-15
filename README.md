@@ -8,7 +8,7 @@ tracking.
 The point is not to code the papers. It is to sit inside each era's constraints
 long enough to feel why the next breakthrough had to happen.
 
-**Currently on:** Word2Vec (Mikolov et al. 2013a).
+**Currently on:** BPE, subword units (Sennrich, Haddow & Birch 2016).
 Findings so far are in [`reports/`](reports/).
 
 ## The arc
@@ -26,6 +26,7 @@ efficiency (FlashAttention, MoE, LoRA) -> alignment (RLHF, DPO) -> reasoning
 | A Neural Probabilistic Language Model (Bengio et al.) | 2003 | [`notebooks/bengio_2003_neural_probabilistic_nl_model.ipynb`](notebooks/bengio_2003_neural_probabilistic_nl_model.ipynb) |
 | A Unified Architecture for NLP (Collobert & Weston) | 2008 | [`notebooks/collobert_and_weston_2008.ipynb`](notebooks/collobert_and_weston_2008.ipynb) |
 | Efficient Estimation of Word Representations (Mikolov et al.) | 2013 | [`notebooks/mikolov-2013a.ipynb`](notebooks/mikolov-2013a.ipynb) + [`scripts/`](scripts/) |
+| GloVe: Global Vectors for Word Representation (Pennington et al.) | 2014 | [`notebooks/GloVe.ipynb`](notebooks/GloVe.ipynb) |
 
 ## Structure
 
