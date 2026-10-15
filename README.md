@@ -8,7 +8,7 @@ tracking.
 The point is not to code the papers. It is to sit inside each era's constraints
 long enough to feel why the next breakthrough had to happen.
 
-**Currently on:** BPE, subword units (Sennrich, Haddow & Birch 2016).
+**Currently on:** Attention for NMT (Bahdanau, Cho & Bengio 2014). BPE (Sennrich et al. 2016) is paused and resumes after it.
 Findings so far are in [`reports/`](reports/).
 
 ## The arc
