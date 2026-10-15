@@ -150,12 +150,18 @@ def main():
         ck = torch.load(Path(run) / "latest.pt", map_location="cpu")
         W = ck["state_dict"]["word_emb.weight"].to(device)
         W = W / (W.norm(dim=1, keepdim=True) + 1e-8)
-        name = ck["kind"]
+        # Key by run directory, not by ck["kind"]: two runs of the same kind -
+        # HS vs NS skip-gram, say - both report "skipgram", and the second
+        # silently overwrote the first, printing one model twice with a +0.0
+        # gap in every cell. Directory names are unique by construction, and
+        # stripping "run_" keeps the original skipgram/cbow column labels.
+        name = Path(run).name.removeprefix("run_")
+        assert name not in hits, f"duplicate run label {name!r}"
         names.append(name)
         hits[name] = score(W, q, device)
         # cross-check against the known eval.txt totals
         print(
-            f"  {name:<10} {hits[name].sum()}/{len(q)} "
+            f"  {name:<14} {hits[name].sum()}/{len(q)} "
             f"= {100*hits[name].mean():.1f}% total"
         )
 
