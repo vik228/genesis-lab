@@ -1,0 +1,673 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GloVe 2014 - Ratios, Counts &amp; Vectors</title>
+<style>
+  :root {
+    --paper: #f5f6f2;
+    --paper-raised: #ffffff;
+    --ink: #1c222b;
+    --ink-soft: #565f6b;
+    --ink-faint: #8a919b;
+    --accent: #2a4494;
+    --accent-soft: #e8ebf7;
+    --accent-line: #c4cdea;
+    --highlight: #93641a;
+    --highlight-soft: #f3e6cd;
+    --rule: #dcded5;
+    --code-bg: #eef0ea;
+    --pad-cell: #eceee7;
+    --good: #2f6b46;
+    --good-soft: #dfeee6;
+    --shadow: 0 1px 2px rgba(28,34,43,0.06), 0 8px 24px -12px rgba(28,34,43,0.12);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #14171c;
+      --paper-raised: #1a1e25;
+      --ink: #e7e9e4;
+      --ink-soft: #a3aab3;
+      --ink-faint: #6b7280;
+      --accent: #8ba0e8;
+      --accent-soft: #212a44;
+      --accent-line: #364373;
+      --highlight: #d9a857;
+      --highlight-soft: #332913;
+      --rule: #2a2e36;
+      --code-bg: #1e222a;
+      --pad-cell: #22262e;
+      --good: #6fb891;
+      --good-soft: #16301f;
+      --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 24px -12px rgba(0,0,0,0.5);
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper: #14171c;
+    --paper-raised: #1a1e25;
+    --ink: #e7e9e4;
+    --ink-soft: #a3aab3;
+    --ink-faint: #6b7280;
+    --accent: #8ba0e8;
+    --accent-soft: #212a44;
+    --accent-line: #364373;
+    --highlight: #d9a857;
+    --highlight-soft: #332913;
+    --rule: #2a2e36;
+    --code-bg: #1e222a;
+    --pad-cell: #22262e;
+    --good: #6fb891;
+    --good-soft: #16301f;
+    --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 24px -12px rgba(0,0,0,0.5);
+  }
+  :root[data-theme="light"] {
+    --paper: #f5f6f2;
+    --paper-raised: #ffffff;
+    --ink: #1c222b;
+    --ink-soft: #565f6b;
+    --ink-faint: #8a919b;
+    --accent: #2a4494;
+    --accent-soft: #e8ebf7;
+    --accent-line: #c4cdea;
+    --highlight: #93641a;
+    --highlight-soft: #f3e6cd;
+    --rule: #dcded5;
+    --code-bg: #eef0ea;
+    --pad-cell: #eceee7;
+    --good: #2f6b46;
+    --good-soft: #dfeee6;
+    --shadow: 0 1px 2px rgba(28,34,43,0.06), 0 8px 24px -12px rgba(28,34,43,0.12);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .mono {
+    font-family: ui-monospace, "SF Mono", "Cascadia Code", "JetBrains Mono", Menlo, Consolas, monospace;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .page {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 56px 24px 96px;
+  }
+
+  /* ---------- header ---------- */
+
+  .eyebrow {
+    font-family: ui-monospace, "SF Mono", "Cascadia Code", monospace;
+    font-size: 12px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--accent);
+    font-weight: 600;
+  }
+
+  h1 {
+    font-family: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif;
+    font-size: 34px;
+    font-weight: 600;
+    margin: 8px 0 6px;
+    text-wrap: balance;
+    letter-spacing: -0.01em;
+  }
+
+  .dek {
+    color: var(--ink-soft);
+    font-size: 15.5px;
+    max-width: 60ch;
+    margin: 0 0 22px;
+  }
+
+  nav.toc {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 18px;
+    padding: 14px 0;
+    border-top: 1px solid var(--rule);
+    border-bottom: 1px solid var(--rule);
+    margin-bottom: 40px;
+  }
+  nav.toc a {
+    font-family: ui-monospace, "SF Mono", "Cascadia Code", monospace;
+    font-size: 12px;
+    letter-spacing: 0.03em;
+    color: var(--ink-soft);
+    text-decoration: none;
+    border-bottom: 1px solid transparent;
+  }
+  nav.toc a:hover, nav.toc a:focus-visible {
+    color: var(--accent);
+    border-bottom-color: var(--accent-line);
+  }
+  nav.toc a:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+  /* ---------- section scaffolding ---------- */
+
+  section { margin-bottom: 52px; scroll-margin-top: 20px; }
+
+  .section-head {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    margin-bottom: 18px;
+  }
+  .section-num {
+    font-family: ui-monospace, "SF Mono", "Cascadia Code", monospace;
+    font-size: 12px;
+    color: var(--ink-faint);
+  }
+  h2 {
+    font-family: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif;
+    font-size: 21px;
+    font-weight: 600;
+    margin: 0;
+    text-wrap: balance;
+  }
+  h3 {
+    font-family: ui-monospace, "SF Mono", "Cascadia Code", monospace;
+    font-size: 11px;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    font-weight: 600;
+    margin: 32px 0 12px;
+  }
+  h3:first-child { margin-top: 0; }
+  .section-note {
+    color: var(--ink-soft);
+    font-size: 14px;
+    margin: -10px 0 18px;
+    max-width: 62ch;
+  }
+  p.body-text {
+    color: var(--ink);
+    font-size: 14.5px;
+    max-width: 62ch;
+    margin: 0 0 14px;
+  }
+  p.body-text strong { color: var(--ink); }
+
+  /* ---------- hyperparameter strip ---------- */
+
+  .hp-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 1px;
+    background: var(--rule);
+    border: 1px solid var(--rule);
+    border-radius: 6px;
+    overflow: hidden;
+  }
+  .hp-cell {
+    background: var(--paper-raised);
+    padding: 12px 14px;
+  }
+  .hp-key {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--ink-faint);
+    margin-bottom: 5px;
+  }
+  .hp-val {
+    font-family: ui-monospace, "SF Mono", "Cascadia Code", monospace;
+    font-size: 17px;
+    font-weight: 600;
+    color: var(--ink);
+  }
+  .hp-val .unit { font-size: 12px; color: var(--ink-soft); font-weight: 400; margin-left: 2px; }
+
+  /* ---------- tables ---------- */
+
+  .tbl-wrap { overflow-x: auto; border: 1px solid var(--rule); border-radius: 6px; }
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    min-width: 480px;
+    font-size: 13.5px;
+  }
+  thead th {
+    text-align: left;
+    font-family: ui-monospace, "SF Mono", "Cascadia Code", monospace;
+    font-size: 11px;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    background: var(--paper-raised);
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--rule);
+    white-space: nowrap;
+  }
+  thead th.num { text-align: right; }
+  tbody td {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--rule);
+    vertical-align: top;
+    color: var(--ink-soft);
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr { background: var(--paper-raised); transition: background 0.12s ease; }
+  @media (prefers-reduced-motion: reduce) { tbody tr { transition: none; } }
+  tbody tr:hover { background: var(--accent-soft); }
+  td.sym, td code, .sym {
+    font-family: ui-monospace, "SF Mono", "Cascadia Code", monospace;
+    color: var(--ink);
+    white-space: nowrap;
+  }
+  td.shape {
+    font-family: ui-monospace, "SF Mono", "Cascadia Code", monospace;
+    color: var(--accent);
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  td.wrap { white-space: normal; }
+
+  /* ---------- results table ---------- */
+
+  td.num {
+    font-family: ui-monospace, "SF Mono", "Cascadia Code", monospace;
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+    color: var(--ink);
+    white-space: nowrap;
+    vertical-align: middle;
+  }
+  td.num.dim { color: var(--ink-soft); }
+  td.f1 {
+    font-family: ui-monospace, "SF Mono", "Cascadia Code", monospace;
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+    color: var(--ink);
+    white-space: nowrap;
+    vertical-align: middle;
+    min-width: 96px;
+  }
+  .meter {
+    display: block;
+    height: 3px;
+    border-radius: 2px;
+    background: var(--accent-line);
+    margin-top: 6px;
+    overflow: hidden;
+  }
+  .meter i { display: block; height: 100%; background: var(--accent); }
+  tbody tr.total td {
+    border-top: 2px solid var(--accent-line);
+    color: var(--ink);
+    font-weight: 600;
+    background: var(--accent-soft);
+  }
+  tbody tr.live td {
+    background: var(--highlight-soft);
+    color: var(--ink);
+  }
+  tbody tr.live:hover td { background: var(--highlight-soft); }
+  tbody tr.group-start td { border-top: 1px solid var(--rule); padding-top: 14px; }
+
+  /* ---------- crossover chart ---------- */
+
+  .xover { display: flex; flex-direction: column; gap: 7px; }
+  .xover-row {
+    display: grid;
+    grid-template-columns: 78px 1fr 74px;
+    align-items: center;
+    gap: 10px;
+  }
+  .xover-label, .xover-val {
+    font-family: ui-monospace, "SF Mono", "Cascadia Code", monospace;
+    font-variant-numeric: tabular-nums;
+    font-size: 11.5px;
+    color: var(--ink-faint);
+  }
+  .xover-label { text-align: right; }
+  .xover-val { font-weight: 600; }
+  .xover-val.hs { color: var(--highlight); }
+  .xover-val.ns { color: var(--accent); }
+  .xover-track {
+    position: relative;
+    height: 15px;
+    background: var(--code-bg);
+    border-radius: 3px;
+  }
+  .xover-track::before {
+    content: "";
+    position: absolute;
+    left: 50%; top: -2px; bottom: -2px;
+    width: 1px;
+    background: var(--ink-faint);
+    opacity: 0.55;
+  }
+  .xover-track i {
+    position: absolute;
+    top: 3px;
+    height: 9px;
+    border-radius: 2px;
+  }
+  .xover-track i.hs { right: 50%; background: var(--highlight); }
+  .xover-track i.ns { left: 50%; background: var(--accent); }
+  .xover-key {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    font-family: ui-monospace, "SF Mono", "Cascadia Code", monospace;
+    font-size: 11px;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin-bottom: 12px;
+  }
+  .xover-key b { font-weight: 600; }
+  .xover-key .l { color: var(--highlight); }
+  .xover-key .r { color: var(--accent); }
+  .xover-key .mid { text-align: center; }
+  @media (max-width: 520px) {
+    .xover-row { grid-template-columns: 64px 1fr 68px; gap: 7px; }
+    .xover-label, .xover-val { font-size: 10.5px; }
+    .xover-key .mid { display: none; }
+  }
+
+  /* ---------- formula callout ---------- */
+
+  .formula-box {
+    background: var(--accent-soft);
+    border-left: 3px solid var(--accent);
+    border-radius: 4px;
+    padding: 20px 22px;
+    margin: 0 0 16px;
+  }
+  .formula-box + .formula-box { margin-top: -4px; }
+  .f-line {
+    font-family: ui-monospace, "SF Mono", "Cascadia Code", monospace;
+    font-size: 14.5px;
+    line-height: 2;
+    color: var(--ink);
+  }
+  .f-comment {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    color: var(--ink-soft);
+    font-size: 13px;
+    margin-top: 2px;
+  }
+  .f-title {
+    font-family: ui-monospace, "SF Mono", "Cascadia Code", monospace;
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--accent);
+    font-weight: 600;
+    margin-bottom: 10px;
+  }
+
+  /* ---------- warn callout ---------- */
+
+  .warn {
+    background: var(--highlight-soft);
+    border-left: 3px solid var(--highlight);
+    border-radius: 4px;
+    padding: 16px 20px;
+    margin: 16px 0 0;
+    font-size: 13.5px;
+    color: var(--ink-soft);
+  }
+  .warn strong { color: var(--ink); }
+  .warn .w-title {
+    font-family: ui-monospace, "SF Mono", "Cascadia Code", monospace;
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--highlight);
+    font-weight: 600;
+    display: block;
+    margin-bottom: 7px;
+  }
+
+  /* ---------- window / radius diagram ---------- */
+
+  .strip {
+    display: grid;
+    grid-template-columns: repeat(12, 1fr);
+    gap: 4px;
+    margin-bottom: 8px;
+  }
+  .cell {
+    aspect-ratio: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: ui-monospace, "SF Mono", "Cascadia Code", monospace;
+    font-size: 12px;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--ink-faint);
+  }
+  .strip.tokens .cell {
+    background: var(--code-bg);
+    color: var(--ink-soft);
+    font-weight: 500;
+  }
+  .strip.tokens .cell.pad { background: transparent; border: 1px dashed var(--rule); color: var(--ink-faint); font-size: 9px; }
+  .strip.tokens .cell.centre { background: var(--accent); color: #fff; font-weight: 600; }
+  .strip.window .cell.active {
+    background: var(--accent);
+    color: #fff;
+    font-weight: 600;
+  }
+  .strip.window .cell.active.centre-active {
+    background: var(--highlight);
+  }
+  .win-row { display: flex; align-items: center; gap: 12px; margin-top: 10px; }
+  .win-label {
+    font-family: ui-monospace, "SF Mono", "Cascadia Code", monospace;
+    font-size: 12px;
+    color: var(--ink-soft);
+    width: 46px;
+    flex-shrink: 0;
+    text-align: right;
+  }
+  .win-grid { flex: 1; }
+  .diagram-card {
+    background: var(--paper-raised);
+    border: 1px solid var(--rule);
+    border-radius: 6px;
+    padding: 20px;
+  }
+  .diagram-caption {
+    font-size: 12.5px;
+    color: var(--ink-faint);
+    margin-top: 14px;
+    padding-top: 12px;
+    border-top: 1px solid var(--rule);
+  }
+
+  /* ---------- pipeline flow ---------- */
+
+  .flow {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+  .flow-step {
+    display: grid;
+    grid-template-columns: 20px 1fr;
+    gap: 14px;
+  }
+  .flow-rail {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  .flow-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--accent);
+    margin-top: 6px;
+    flex-shrink: 0;
+  }
+  .flow-line {
+    width: 1.5px;
+    flex: 1;
+    background: var(--rule);
+    margin: 2px 0;
+  }
+  .flow-step:last-child .flow-line { display: none; }
+  .flow-body { padding-bottom: 22px; }
+  .flow-shape {
+    font-family: ui-monospace, "SF Mono", "Cascadia Code", monospace;
+    font-size: 14.5px;
+    font-weight: 600;
+    color: var(--accent);
+  }
+  .flow-desc { font-size: 13.5px; color: var(--ink-soft); margin-top: 3px; }
+
+  /* ---------- misc ---------- */
+
+  .tag {
+    display: inline-block;
+    font-family: ui-monospace, "SF Mono", "Cascadia Code", monospace;
+    font-size: 10.5px;
+    letter-spacing: 0.02em;
+    padding: 2px 7px;
+    border-radius: 4px;
+    background: var(--highlight-soft);
+    color: var(--highlight);
+    font-weight: 600;
+    margin-left: 8px;
+    vertical-align: middle;
+  }
+  .tag.ok { background: var(--good-soft); color: var(--good); }
+  .tag.bad { background: var(--highlight-soft); color: var(--highlight); }
+
+  footer {
+    margin-top: 60px;
+    padding-top: 20px;
+    border-top: 1px solid var(--rule);
+    font-size: 12.5px;
+    color: var(--ink-faint);
+  }
+
+  a { color: var(--accent); }
+</style>
+<style>
+  .status{display:inline-block;margin:0 0 20px;padding:5px 9px;border-radius:4px;background:var(--highlight-soft);color:var(--highlight);font:600 10.5px ui-monospace,monospace;letter-spacing:.07em;text-transform:uppercase}
+  .equation-stack{display:grid;gap:8px}.equation-row{display:grid;grid-template-columns:minmax(120px,.7fr) minmax(0,1.5fr);gap:14px;align-items:baseline}.equation-row .label{color:var(--ink-soft);font-size:12px}.equation-row .f-line{overflow-wrap:anywhere}
+  .two-col{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.mini-card{min-width:0;border:1px solid var(--rule);background:var(--paper-raised);border-radius:6px;padding:16px}.mini-card h3{margin-top:0}
+  .metric{display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-bottom:1px solid var(--rule)}.metric:last-child{border-bottom:0}.metric span:first-child{color:var(--ink-soft)}.metric strong{font:600 13px ui-monospace,monospace;font-variant-numeric:tabular-nums;text-align:right}
+  .step-list{display:grid;gap:0}.step{display:grid;grid-template-columns:32px minmax(0,1fr);gap:12px;padding:0 0 18px}.step-no{color:var(--accent);font:600 12px ui-monospace,monospace}.step p{margin:0;font-size:13.5px;color:var(--ink-soft)}.step strong{color:var(--ink)}
+  .note-small{color:var(--ink-faint);font-size:12px}
+  @media(max-width:560px){.two-col{grid-template-columns:minmax(0,1fr)}.equation-row{grid-template-columns:minmax(0,1fr);gap:0}}
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="eyebrow">Genesis Lab · Stage 2 · 2014</div>
+  <h1>GloVe: Ratios, Counts &amp; Vectors</h1>
+  <p class="dek">How global word-context counts become a weighted regression objective, and what happened when we trained the model on text8.</p>
+  <div class="status">Training complete · evaluation in progress</div>
+  <nav class="toc" aria-label="Section index">
+    <a href="#idea">Core idea</a><a href="#derivation">Derivation</a><a href="#objective">Objective</a><a href="#shapes">Tensor shapes</a><a href="#counts">Counts</a><a href="#run">Training run</a><a href="#diagnostic">Diagnostics</a><a href="#next">Open work</a>
+  </nav>
+
+  <section id="idea">
+    <div class="section-head"><span class="section-num">01</span><h2>The information GloVe keeps</h2></div>
+    <p class="section-note">A local prediction objective learns from word-context events, but does not retain their exact corpus-wide counts. GloVe builds those counts explicitly, then asks the vectors to reproduce their useful structure.</p>
+    <div class="hp-grid">
+      <div class="hp-cell"><div class="hp-key">Corpus</div><div class="hp-val">text8</div></div><div class="hp-cell"><div class="hp-key">Tokens</div><div class="hp-val">17.01<span class="unit">M</span></div></div><div class="hp-cell"><div class="hp-key">Vocabulary</div><div class="hp-val">253,854</div></div><div class="hp-cell"><div class="hp-key">Observed pairs</div><div class="hp-val">7.58<span class="unit">M unique</span></div></div><div class="hp-cell"><div class="hp-key">Embedding dim</div><div class="hp-val">50</div></div>
+    </div>
+    <div class="formula-box" style="margin-top:16px"><div class="f-title">Co-occurrence statistics</div><div class="f-line">X<sub>ik</sub> = count of context word k around target word i</div><div class="f-line">X<sub>i</sub> = Σ<sub>k</sub> X<sub>ik</sub></div><div class="f-comment">P(k | i) = X<sub>ik</sub> / X<sub>i</sub>. The row total is context mass, not necessarily token frequency.</div></div>
+  </section>
+
+  <section id="derivation">
+    <div class="section-head"><span class="section-num">02</span><h2>From a probability ratio to a dot product</h2></div>
+    <p class="section-note">Hold context k fixed and compare how strongly it associates with two targets i and j. Their ratio isolates the context's contrast.</p>
+    <div class="step-list">
+      <div class="step"><div class="step-no">01</div><p><strong>Compare conditional probabilities.</strong> A context that occurs with both targets equally has ratio 1; a distinguishing context pushes the ratio above or below 1.</p></div>
+      <div class="step"><div class="step-no">02</div><p><strong>Take logs.</strong> The ratio becomes a difference that vector scores can represent.</p></div>
+      <div class="step"><div class="step-no">03</div><p><strong>Represent each score.</strong> Let a target-context score be <span class="mono">w<sub>i</sub> · c<sub>k</sub></span>. Subtracting target scores gives a relation vector projected onto the fixed context.</p></div>
+      <div class="step"><div class="step-no">04</div><p><strong>Substitute the count ratio.</strong> Expanding <span class="mono">P(k|i)=X<sub>ik</sub>/X<sub>i</sub></span> introduces the target row total; a target bias absorbs that target-only offset. Symmetry gives a context bias.</p></div>
+    </div>
+    <div class="formula-box"><div class="f-title">The derivation spine</div><div class="equation-stack">
+      <div class="equation-row"><div class="label mono">Contrast</div><div class="f-line">F((w<sub>i</sub> − w<sub>j</sub>) · c<sub>k</sub>) = P<sub>ik</sub> / P<sub>jk</sub></div></div>
+      <div class="equation-row"><div class="label mono">Log ratio</div><div class="f-line">(w<sub>i</sub> − w<sub>j</sub>) · c<sub>k</sub> = log P<sub>ik</sub> − log P<sub>jk</sub></div></div>
+      <div class="equation-row"><div class="label mono">Count form</div><div class="f-line">log P<sub>ik</sub> = log X<sub>ik</sub> − log X<sub>i</sub></div></div>
+      <div class="equation-row"><div class="label mono">Prediction</div><div class="f-line">w<sub>i</sub> · c<sub>k</sub> + b<sub>i</sub> + d<sub>k</sub> ≈ log X<sub>ik</sub></div></div>
+    </div><div class="f-comment" style="margin-top:12px">The biases are learned parameters in the final objective; they are not fixed equal to observed row sums.</div></div>
+  </section>
+
+  <section id="objective">
+    <div class="section-head"><span class="section-num">03</span><h2>Weighted least squares</h2></div>
+    <p class="section-note">Each observed pair supplies a positive count and a log-count target. The weight limits the influence of both unreliable rare pairs and extremely frequent pairs.</p>
+    <div class="formula-box"><div class="f-title">Per-pair weight and objective</div><div class="f-line">f(X<sub>ik</sub>) = min((X<sub>ik</sub> / x<sub>max</sub>)<sup>α</sup>, 1)</div><div class="f-line">J = Σ<sub>i,k : X<sub>ik</sub> &gt; 0</sub> f(X<sub>ik</sub>) [w<sub>i</sub> · c<sub>k</sub> + b<sub>i</sub> + d<sub>k</sub> − log X<sub>ik</sub>]<sup>2</sup></div><div class="f-comment">Paper values: x<sub>max</sub> = 100, α = 3/4. The target remains the raw log count, including for pairs above x<sub>max</sub>.</div></div>
+    <div class="two-col"><div class="mini-card"><h3>What clipping does</h3><p class="body-text">Counts below 100 receive a fractional weight. Counts at or above 100 receive weight 1; their target still grows as log(count).</p></div><div class="mini-card"><h3>Why it is a squared error</h3><p class="body-text">The model predicts one scalar for each observed pair. Squaring the residual penalizes large deviations; the weighting function controls each pair's influence.</p></div></div>
+  </section>
+
+  <section id="shapes">
+    <div class="section-head"><span class="section-num">04</span><h2>Model and tensor shapes</h2></div>
+    <p class="section-note">The implementation reserves ID 0 for padding; real vocabulary IDs are 1 through V. Each word has separate parameters for target and context roles.</p>
+    <div class="tbl-wrap"><table><thead><tr><th>Tensor / parameter</th><th>Shape</th><th>Role</th></tr></thead><tbody>
+      <tr><td class="sym">word_embeddings.weight</td><td class="shape">(V+1, D)</td><td class="wrap">Target-role vector w<sub>i</sub>.</td></tr>
+      <tr><td class="sym">context_embeddings.weight</td><td class="shape">(V+1, D)</td><td class="wrap">Context-role vector c<sub>k</sub>; it is k's learned vector, not an average of its neighbours.</td></tr>
+      <tr><td class="sym">word_biases.weight</td><td class="shape">(V+1, 1)</td><td class="wrap">Scalar b<sub>i</sub>.</td></tr><tr><td class="sym">context_biases.weight</td><td class="shape">(V+1, 1)</td><td class="wrap">Scalar d<sub>k</sub>.</td></tr>
+      <tr><td class="sym">batch IDs</td><td class="shape">(B,)</td><td class="wrap">One target and one context ID per observed pair.</td></tr><tr><td class="sym">prediction / count</td><td class="shape">(B, 1)</td><td class="wrap">Predicted dot product plus biases; count becomes the log-count target.</td></tr>
+    </tbody></table></div>
+    <div class="formula-box" style="margin-top:16px"><div class="f-title">One pair's forward pass</div><div class="f-line">ŷ<sub>ik</sub> = Σ<sub>r=1..D</sub> w<sub>ir</sub> c<sub>kr</sub> + b<sub>i</sub> + d<sub>k</sub></div><div class="f-line">e<sub>ik</sub> = ŷ<sub>ik</sub> − log X<sub>ik</sub></div></div>
+  </section>
+
+  <section id="counts">
+    <div class="section-head"><span class="section-num">05</span><h2>Building the global table</h2></div>
+    <p class="section-note">With radius C=1, each adjacent pair contributes in both target-context orders. Chunking limits the temporary pair tensor; a final merge combines repeated pairs.</p>
+    <div class="diagram-card"><div class="formula-box"><div class="f-title">Example sentence</div><div class="f-line">ice is cold</div></div>
+      <div class="flow">
+        <div class="flow-step"><div class="flow-rail"><div class="flow-dot"></div><div class="flow-line"></div></div><div class="flow-body"><div class="flow-shape">(ice, is), (is, ice)</div><div class="flow-desc">Adjacent positions contribute both ordered pairs.</div></div></div>
+        <div class="flow-step"><div class="flow-rail"><div class="flow-dot"></div><div class="flow-line"></div></div><div class="flow-body"><div class="flow-shape">(is, cold), (cold, is)</div><div class="flow-desc">At a corpus boundary, missing context is padding and contributes no pair.</div></div></div>
+        <div class="flow-step"><div class="flow-rail"><div class="flow-dot"></div></div><div class="flow-body"><div class="flow-shape">chunk-local unique → global combine</div><div class="flow-desc">The final text8 matrix stores only observed pairs as triplets (target ID, context ID, count), not a dense V×V array.</div></div></div>
+      </div>
+    </div>
+    <p class="body-text" style="margin-top:16px">For the full text8 stream, C=1 produced <strong>34,010,412</strong> ordered context events and <strong>7,582,569</strong> unique ordered pairs. Counts are symmetric under this window, but (i,k) and (k,i) remain separate training rows.</p>
+  </section>
+
+  <section id="run">
+    <div class="section-head"><span class="section-num">06</span><h2>The run that completed</h2></div>
+    <p class="section-note">One full-corpus run with one seed. Training optimized its stated regression objective; the final loss alone does not certify embedding quality.</p>
+    <div class="hp-grid">
+      <div class="hp-cell"><div class="hp-key">Window radius C</div><div class="hp-val">1</div></div><div class="hp-cell"><div class="hp-key">Optimizer</div><div class="hp-val">SGD</div></div><div class="hp-cell"><div class="hp-key">Learning rate</div><div class="hp-val">0.01</div></div><div class="hp-cell"><div class="hp-key">Batch</div><div class="hp-val">32</div></div><div class="hp-cell"><div class="hp-key">Epochs</div><div class="hp-val">50</div></div><div class="hp-cell"><div class="hp-key">Seed</div><div class="hp-val">42</div></div><div class="hp-cell"><div class="hp-key">Final weighted loss</div><div class="hp-val">0.4124</div></div><div class="hp-cell"><div class="hp-key">Device</div><div class="hp-val">T4</div></div>
+    </div>
+    <div class="warn"><span class="w-title">Implementation vs paper</span>This run used C=1, raw unit counts, and SGD. The paper's experiments use a wider context window with inverse-distance contributions and AdaGrad. So this is a working GloVe objective, but not an exact reproduction of the paper's complete training setup.</div>
+  </section>
+
+  <section id="diagnostic">
+    <div class="section-head"><span class="section-num">07</span><h2>What the first evaluation checks found</h2></div>
+    <p class="section-note">The analogy benchmark is not run yet. These nearest-neighbour checks are diagnostics, not the paper's final evaluation metric.</p>
+    <div class="two-col">
+      <div class="mini-card"><h3>Cosine neighbours for “ice”</h3><p class="body-text">Word-only top neighbours looked unrelated: <span class="mono">daro</span>, <span class="mono">daleminzi</span>, <span class="mono">veddas</span>, <span class="mono">salsbury</span>, <span class="mono">fraternising</span>. Sum-of-tables neighbours were unrelated as well.</p><div class="metric"><span>Top word-only cosine</span><strong>0.5804</strong></div><div class="metric"><span>Median vector cosine to initialization</span><strong>0.99998</strong></div><div class="metric"><span>Ice target length</span><strong>6.0147 → 2.8518</strong></div></div>
+      <div class="mini-card"><h3>Observed pairs with target “ice”</h3><div class="metric"><span>Distinct context pairs</span><strong>903</strong></div><div class="metric"><span>Weighted subset loss</span><strong>2.5407 → 0.2551</strong></div><div class="metric"><span>Top-5 pair loss</span><strong>22.0462 → 2.6907</strong></div><p class="body-text" style="margin-top:10px">The subset fit improved, while nearest neighbours remained poor. Loss reduction and semantic quality answer different questions.</p></div>
+    </div>
+    <div class="formula-box" style="margin-top:16px"><div class="f-title">One pair: (ice, hockey)</div><div class="tbl-wrap"><table><thead><tr><th>Component</th><th class="num">Initial</th><th class="num">Trained</th></tr></thead><tbody>
+      <tr><td class="sym">w<sub>ice</sub> · c<sub>hockey</sub></td><td class="num">8.4132</td><td class="num">2.7248</td></tr><tr><td class="sym">b<sub>ice</sub> + d<sub>hockey</sub></td><td class="num">0.7766</td><td class="num">1.3046</td></tr><tr class="total"><td class="sym">Prediction</td><td class="num">9.1898</td><td class="num">4.0294</td></tr><tr><td class="sym">Target log(count)</td><td class="num">5.3279</td><td class="num">5.3279</td></tr>
+    </tbody></table></div><div class="f-comment" style="margin-top:10px">The pair's dot product changed; its norm and angle contributions are still to be measured. The ice vector's before/after cosine (0.9551) compares two ice vectors; it does not give the angle between w<sub>ice</sub> and c<sub>hockey</sub>.</div></div>
+  </section>
+
+  <section id="next">
+    <div class="section-head"><span class="section-num">08</span><h2>Open work</h2></div>
+    <div class="flow">
+      <div class="flow-step"><div class="flow-rail"><div class="flow-dot"></div><div class="flow-line"></div></div><div class="flow-body"><div class="flow-shape">Separate dot-product length and angle effects</div><div class="flow-desc">For (ice, hockey), compare target norm, context norm, and pair cosine before vs after. Verify norm(w) × norm(c) × cosine equals the raw dot product.</div></div></div>
+      <div class="flow-step"><div class="flow-rail"><div class="flow-dot"></div><div class="flow-line"></div></div><div class="flow-body"><div class="flow-shape">Validate the paper's claim</div><div class="flow-desc">Run the analogy evaluation and report its protocol and result. The paper's quality claim remains untested until then.</div></div></div>
+      <div class="flow-step"><div class="flow-rail"><div class="flow-dot"></div></div><div class="flow-body"><div class="flow-shape">Compare against the paper setup</div><div class="flow-desc">Record the current deviations and decide whether the Light-tier reproduction is sufficient before any additional training.</div></div></div>
+    </div>
+    <div class="warn"><span class="w-title">Interpretation guardrail</span>A falling weighted regression loss shows that predictions fit the observed log counts better. It does not by itself establish useful cosine neighbourhoods or analogy accuracy.</div>
+  </section>
+
+  <footer>Based on Pennington, Socher &amp; Manning, “GloVe: Global Vectors for Word Representation” (EMNLP 2014), and the from-scratch text8 implementation and diagnostics above. This artifact records a completed training run with evaluation still open.</footer>
+</div>
+</body>
+</html>

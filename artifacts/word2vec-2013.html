@@ -1,0 +1,943 @@
+<title>Word2Vec (Mikolov 2013) - Mechanics &amp; Results</title>
+<style>
+  :root {
+    --paper: #f5f6f2;
+    --paper-raised: #ffffff;
+    --ink: #1c222b;
+    --ink-soft: #565f6b;
+    --ink-faint: #8a919b;
+    --accent: #2a4494;
+    --accent-soft: #e8ebf7;
+    --accent-line: #c4cdea;
+    --highlight: #93641a;
+    --highlight-soft: #f3e6cd;
+    --rule: #dcded5;
+    --code-bg: #eef0ea;
+    --pad-cell: #eceee7;
+    --good: #2f6b46;
+    --good-soft: #dfeee6;
+    --shadow: 0 1px 2px rgba(28,34,43,0.06), 0 8px 24px -12px rgba(28,34,43,0.12);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #14171c;
+      --paper-raised: #1a1e25;
+      --ink: #e7e9e4;
+      --ink-soft: #a3aab3;
+      --ink-faint: #6b7280;
+      --accent: #8ba0e8;
+      --accent-soft: #212a44;
+      --accent-line: #364373;
+      --highlight: #d9a857;
+      --highlight-soft: #332913;
+      --rule: #2a2e36;
+      --code-bg: #1e222a;
+      --pad-cell: #22262e;
+      --good: #6fb891;
+      --good-soft: #16301f;
+      --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 24px -12px rgba(0,0,0,0.5);
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper: #14171c;
+    --paper-raised: #1a1e25;
+    --ink: #e7e9e4;
+    --ink-soft: #a3aab3;
+    --ink-faint: #6b7280;
+    --accent: #8ba0e8;
+    --accent-soft: #212a44;
+    --accent-line: #364373;
+    --highlight: #d9a857;
+    --highlight-soft: #332913;
+    --rule: #2a2e36;
+    --code-bg: #1e222a;
+    --pad-cell: #22262e;
+    --good: #6fb891;
+    --good-soft: #16301f;
+    --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 24px -12px rgba(0,0,0,0.5);
+  }
+  :root[data-theme="light"] {
+    --paper: #f5f6f2;
+    --paper-raised: #ffffff;
+    --ink: #1c222b;
+    --ink-soft: #565f6b;
+    --ink-faint: #8a919b;
+    --accent: #2a4494;
+    --accent-soft: #e8ebf7;
+    --accent-line: #c4cdea;
+    --highlight: #93641a;
+    --highlight-soft: #f3e6cd;
+    --rule: #dcded5;
+    --code-bg: #eef0ea;
+    --pad-cell: #eceee7;
+    --good: #2f6b46;
+    --good-soft: #dfeee6;
+    --shadow: 0 1px 2px rgba(28,34,43,0.06), 0 8px 24px -12px rgba(28,34,43,0.12);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .mono {
+    font-family: ui-monospace, "SF Mono", "Cascadia Code", "JetBrains Mono", Menlo, Consolas, monospace;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .page {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 56px 24px 96px;
+  }
+
+  /* ---------- header ---------- */
+
+  .eyebrow {
+    font-family: ui-monospace, "SF Mono", "Cascadia Code", monospace;
+    font-size: 12px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--accent);
+    font-weight: 600;
+  }
+
+  h1 {
+    font-family: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif;
+    font-size: 34px;
+    font-weight: 600;
+    margin: 8px 0 6px;
+    text-wrap: balance;
+    letter-spacing: -0.01em;
+  }
+
+  .dek {
+    color: var(--ink-soft);
+    font-size: 15.5px;
+    max-width: 60ch;
+    margin: 0 0 22px;
+  }
+
+  nav.toc {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 18px;
+    padding: 14px 0;
+    border-top: 1px solid var(--rule);
+    border-bottom: 1px solid var(--rule);
+    margin-bottom: 40px;
+  }
+  nav.toc a {
+    font-family: ui-monospace, "SF Mono", "Cascadia Code", monospace;
+    font-size: 12px;
+    letter-spacing: 0.03em;
+    color: var(--ink-soft);
+    text-decoration: none;
+    border-bottom: 1px solid transparent;
+  }
+  nav.toc a:hover, nav.toc a:focus-visible {
+    color: var(--accent);
+    border-bottom-color: var(--accent-line);
+  }
+  nav.toc a:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+  /* ---------- section scaffolding ---------- */
+
+  section { margin-bottom: 52px; scroll-margin-top: 20px; }
+
+  .section-head {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    margin-bottom: 18px;
+  }
+  .section-num {
+    font-family: ui-monospace, "SF Mono", "Cascadia Code", monospace;
+    font-size: 12px;
+    color: var(--ink-faint);
+  }
+  h2 {
+    font-family: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif;
+    font-size: 21px;
+    font-weight: 600;
+    margin: 0;
+    text-wrap: balance;
+  }
+  h3 {
+    font-family: ui-monospace, "SF Mono", "Cascadia Code", monospace;
+    font-size: 11px;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    font-weight: 600;
+    margin: 32px 0 12px;
+  }
+  h3:first-child { margin-top: 0; }
+  .section-note {
+    color: var(--ink-soft);
+    font-size: 14px;
+    margin: -10px 0 18px;
+    max-width: 62ch;
+  }
+  p.body-text {
+    color: var(--ink);
+    font-size: 14.5px;
+    max-width: 62ch;
+    margin: 0 0 14px;
+  }
+  p.body-text strong { color: var(--ink); }
+
+  /* ---------- hyperparameter strip ---------- */
+
+  .hp-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 1px;
+    background: var(--rule);
+    border: 1px solid var(--rule);
+    border-radius: 6px;
+    overflow: hidden;
+  }
+  .hp-cell {
+    background: var(--paper-raised);
+    padding: 12px 14px;
+  }
+  .hp-key {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--ink-faint);
+    margin-bottom: 5px;
+  }
+  .hp-val {
+    font-family: ui-monospace, "SF Mono", "Cascadia Code", monospace;
+    font-size: 17px;
+    font-weight: 600;
+    color: var(--ink);
+  }
+  .hp-val .unit { font-size: 12px; color: var(--ink-soft); font-weight: 400; margin-left: 2px; }
+
+  /* ---------- tables ---------- */
+
+  .tbl-wrap { overflow-x: auto; border: 1px solid var(--rule); border-radius: 6px; }
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    min-width: 480px;
+    font-size: 13.5px;
+  }
+  thead th {
+    text-align: left;
+    font-family: ui-monospace, "SF Mono", "Cascadia Code", monospace;
+    font-size: 11px;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    background: var(--paper-raised);
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--rule);
+    white-space: nowrap;
+  }
+  thead th.num { text-align: right; }
+  tbody td {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--rule);
+    vertical-align: top;
+    color: var(--ink-soft);
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr { background: var(--paper-raised); transition: background 0.12s ease; }
+  @media (prefers-reduced-motion: reduce) { tbody tr { transition: none; } }
+  tbody tr:hover { background: var(--accent-soft); }
+  td.sym, td code, .sym {
+    font-family: ui-monospace, "SF Mono", "Cascadia Code", monospace;
+    color: var(--ink);
+    white-space: nowrap;
+  }
+  td.shape {
+    font-family: ui-monospace, "SF Mono", "Cascadia Code", monospace;
+    color: var(--accent);
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  td.wrap { white-space: normal; }
+
+  /* ---------- results table ---------- */
+
+  td.num {
+    font-family: ui-monospace, "SF Mono", "Cascadia Code", monospace;
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+    color: var(--ink);
+    white-space: nowrap;
+    vertical-align: middle;
+  }
+  td.num.dim { color: var(--ink-soft); }
+  td.f1 {
+    font-family: ui-monospace, "SF Mono", "Cascadia Code", monospace;
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+    color: var(--ink);
+    white-space: nowrap;
+    vertical-align: middle;
+    min-width: 96px;
+  }
+  .meter {
+    display: block;
+    height: 3px;
+    border-radius: 2px;
+    background: var(--accent-line);
+    margin-top: 6px;
+    overflow: hidden;
+  }
+  .meter i { display: block; height: 100%; background: var(--accent); }
+  tbody tr.total td {
+    border-top: 2px solid var(--accent-line);
+    color: var(--ink);
+    font-weight: 600;
+    background: var(--accent-soft);
+  }
+  tbody tr.live td {
+    background: var(--highlight-soft);
+    color: var(--ink);
+  }
+  tbody tr.live:hover td { background: var(--highlight-soft); }
+  tbody tr.group-start td { border-top: 1px solid var(--rule); padding-top: 14px; }
+
+  /* ---------- crossover chart ---------- */
+
+  .xover { display: flex; flex-direction: column; gap: 7px; }
+  .xover-row {
+    display: grid;
+    grid-template-columns: 78px 1fr 74px;
+    align-items: center;
+    gap: 10px;
+  }
+  .xover-label, .xover-val {
+    font-family: ui-monospace, "SF Mono", "Cascadia Code", monospace;
+    font-variant-numeric: tabular-nums;
+    font-size: 11.5px;
+    color: var(--ink-faint);
+  }
+  .xover-label { text-align: right; }
+  .xover-val { font-weight: 600; }
+  .xover-val.hs { color: var(--highlight); }
+  .xover-val.ns { color: var(--accent); }
+  .xover-track {
+    position: relative;
+    height: 15px;
+    background: var(--code-bg);
+    border-radius: 3px;
+  }
+  .xover-track::before {
+    content: "";
+    position: absolute;
+    left: 50%; top: -2px; bottom: -2px;
+    width: 1px;
+    background: var(--ink-faint);
+    opacity: 0.55;
+  }
+  .xover-track i {
+    position: absolute;
+    top: 3px;
+    height: 9px;
+    border-radius: 2px;
+  }
+  .xover-track i.hs { right: 50%; background: var(--highlight); }
+  .xover-track i.ns { left: 50%; background: var(--accent); }
+  .xover-key {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    font-family: ui-monospace, "SF Mono", "Cascadia Code", monospace;
+    font-size: 11px;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin-bottom: 12px;
+  }
+  .xover-key b { font-weight: 600; }
+  .xover-key .l { color: var(--highlight); }
+  .xover-key .r { color: var(--accent); }
+  .xover-key .mid { text-align: center; }
+  @media (max-width: 520px) {
+    .xover-row { grid-template-columns: 64px 1fr 68px; gap: 7px; }
+    .xover-label, .xover-val { font-size: 10.5px; }
+    .xover-key .mid { display: none; }
+  }
+
+  /* ---------- formula callout ---------- */
+
+  .formula-box {
+    background: var(--accent-soft);
+    border-left: 3px solid var(--accent);
+    border-radius: 4px;
+    padding: 20px 22px;
+    margin: 0 0 16px;
+  }
+  .formula-box + .formula-box { margin-top: -4px; }
+  .f-line {
+    font-family: ui-monospace, "SF Mono", "Cascadia Code", monospace;
+    font-size: 14.5px;
+    line-height: 2;
+    color: var(--ink);
+  }
+  .f-comment {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    color: var(--ink-soft);
+    font-size: 13px;
+    margin-top: 2px;
+  }
+  .f-title {
+    font-family: ui-monospace, "SF Mono", "Cascadia Code", monospace;
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--accent);
+    font-weight: 600;
+    margin-bottom: 10px;
+  }
+
+  /* ---------- warn callout ---------- */
+
+  .warn {
+    background: var(--highlight-soft);
+    border-left: 3px solid var(--highlight);
+    border-radius: 4px;
+    padding: 16px 20px;
+    margin: 16px 0 0;
+    font-size: 13.5px;
+    color: var(--ink-soft);
+  }
+  .warn strong { color: var(--ink); }
+  .warn .w-title {
+    font-family: ui-monospace, "SF Mono", "Cascadia Code", monospace;
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--highlight);
+    font-weight: 600;
+    display: block;
+    margin-bottom: 7px;
+  }
+
+  /* ---------- window / radius diagram ---------- */
+
+  .strip {
+    display: grid;
+    grid-template-columns: repeat(12, 1fr);
+    gap: 4px;
+    margin-bottom: 8px;
+  }
+  .cell {
+    aspect-ratio: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: ui-monospace, "SF Mono", "Cascadia Code", monospace;
+    font-size: 12px;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--ink-faint);
+  }
+  .strip.tokens .cell {
+    background: var(--code-bg);
+    color: var(--ink-soft);
+    font-weight: 500;
+  }
+  .strip.tokens .cell.pad { background: transparent; border: 1px dashed var(--rule); color: var(--ink-faint); font-size: 9px; }
+  .strip.tokens .cell.centre { background: var(--accent); color: #fff; font-weight: 600; }
+  .strip.window .cell.active {
+    background: var(--accent);
+    color: #fff;
+    font-weight: 600;
+  }
+  .strip.window .cell.active.centre-active {
+    background: var(--highlight);
+  }
+  .win-row { display: flex; align-items: center; gap: 12px; margin-top: 10px; }
+  .win-label {
+    font-family: ui-monospace, "SF Mono", "Cascadia Code", monospace;
+    font-size: 12px;
+    color: var(--ink-soft);
+    width: 46px;
+    flex-shrink: 0;
+    text-align: right;
+  }
+  .win-grid { flex: 1; }
+  .diagram-card {
+    background: var(--paper-raised);
+    border: 1px solid var(--rule);
+    border-radius: 6px;
+    padding: 20px;
+  }
+  .diagram-caption {
+    font-size: 12.5px;
+    color: var(--ink-faint);
+    margin-top: 14px;
+    padding-top: 12px;
+    border-top: 1px solid var(--rule);
+  }
+
+  /* ---------- pipeline flow ---------- */
+
+  .flow {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+  .flow-step {
+    display: grid;
+    grid-template-columns: 20px 1fr;
+    gap: 14px;
+  }
+  .flow-rail {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  .flow-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--accent);
+    margin-top: 6px;
+    flex-shrink: 0;
+  }
+  .flow-line {
+    width: 1.5px;
+    flex: 1;
+    background: var(--rule);
+    margin: 2px 0;
+  }
+  .flow-step:last-child .flow-line { display: none; }
+  .flow-body { padding-bottom: 22px; }
+  .flow-shape {
+    font-family: ui-monospace, "SF Mono", "Cascadia Code", monospace;
+    font-size: 14.5px;
+    font-weight: 600;
+    color: var(--accent);
+  }
+  .flow-desc { font-size: 13.5px; color: var(--ink-soft); margin-top: 3px; }
+
+  /* ---------- misc ---------- */
+
+  .tag {
+    display: inline-block;
+    font-family: ui-monospace, "SF Mono", "Cascadia Code", monospace;
+    font-size: 10.5px;
+    letter-spacing: 0.02em;
+    padding: 2px 7px;
+    border-radius: 4px;
+    background: var(--highlight-soft);
+    color: var(--highlight);
+    font-weight: 600;
+    margin-left: 8px;
+    vertical-align: middle;
+  }
+  .tag.ok { background: var(--good-soft); color: var(--good); }
+  .tag.bad { background: var(--highlight-soft); color: var(--highlight); }
+
+  footer {
+    margin-top: 60px;
+    padding-top: 20px;
+    border-top: 1px solid var(--rule);
+    font-size: 12.5px;
+    color: var(--ink-faint);
+  }
+
+  a { color: var(--accent); }
+</style>
+
+<div class="page">
+
+  <div class="eyebrow">Genesis Lab - Stage 2</div>
+  <h1>Word2Vec (Mikolov 2013) - Mechanics &amp; Results</h1>
+  <p class="dek">Skip-gram vs CBOW, hierarchical softmax, subsampling and negative sampling - plus where these runs agreed and disagreed with the paper, cleaned up for quick recall.</p>
+
+  <nav class="toc" aria-label="Section index">
+    <a href="#config">Config</a>
+    <a href="#symbols">Symbols</a>
+    <a href="#objectives">Objectives</a>
+    <a href="#softmax">Hier. softmax</a>
+    <a href="#windows">Window sampling</a>
+    <a href="#subsampling">Subsampling</a>
+    <a href="#negsample">Negative sampling</a>
+    <a href="#results">Results</a>
+    <a href="#regimes">Two regimes</a>
+    <a href="#updates">Matched steps</a>
+    <a href="#nsvshs">NS vs HS</a>
+    <a href="#lessons">Lessons</a>
+  </nav>
+
+  <section id="config">
+    <div class="section-head"><span class="section-num">01</span><h2>This run's config</h2></div>
+    <p class="section-note">The concrete numbers everything below plugs into. One seed, one epoch - treat every result as a single sample, not a mean.</p>
+    <div class="hp-grid">
+      <div class="hp-cell"><div class="hp-key">vocab V</div><div class="hp-val">71,290 <span class="unit">min_count 5</span></div></div>
+      <div class="hp-cell"><div class="hp-key">embed dim D</div><div class="hp-val">100</div></div>
+      <div class="hp-cell"><div class="hp-key">window</div><div class="hp-val">5 <span class="unit">max radius</span></div></div>
+      <div class="hp-cell"><div class="hp-key">batch_size</div><div class="hp-val">16</div></div>
+      <div class="hp-cell"><div class="hp-key">learning rate</div><div class="hp-val">1.0 <span class="unit">linear decay</span></div></div>
+      <div class="hp-cell"><div class="hp-key">MAX_EXP</div><div class="hp-val">6.0</div></div>
+      <div class="hp-cell"><div class="hp-key">epochs</div><div class="hp-val">1</div></div>
+      <div class="hp-cell"><div class="hp-key">seed</div><div class="hp-val">42 <span class="unit">one seed only</span></div></div>
+      <div class="hp-cell"><div class="hp-key">corpus</div><div class="hp-val">text8</div></div>
+      <div class="hp-cell"><div class="hp-key">tokens</div><div class="hp-val">16,718,844</div></div>
+      <div class="hp-cell"><div class="hp-key">device</div><div class="hp-val">mps</div></div>
+    </div>
+  </section>
+
+  <section id="symbols">
+    <div class="section-head"><span class="section-num">02</span><h2>Symbol → code mapping</h2></div>
+    <p class="section-note">What each tensor actually is, and - the thing worth pinning down before anything else - which of them survive past training.</p>
+    <div class="tbl-wrap">
+      <table>
+        <thead>
+          <tr><th>Code</th><th>Shape</th><th>Meaning</th></tr>
+        </thead>
+        <tbody>
+          <tr><td class="sym">word_emb</td><td class="shape">(71290, 100)</td><td class="wrap">input embedding table. <strong>This is the only thing evaluation uses.</strong></td></tr>
+          <tr><td class="sym">node_emb</td><td class="shape">(71290, 100)</td><td class="wrap">Huffman internal-node vectors. Never used at eval; discarded after training.</td></tr>
+          <tr><td class="sym">paths / codes / masks</td><td class="shape">(71290, 22) each</td><td class="wrap">per-word Huffman path, bits, and validity mask for the ragged padding</td></tr>
+          <tr><td class="sym">R</td><td class="shape">scalar</td><td class="wrap">random radius, drawn fresh per centre, uniform on {1,2,3,4,5}</td></tr>
+          <tr><td class="sym">h</td><td class="shape">(B, 100)</td><td class="wrap">CBOW's averaged context vector</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="objectives">
+    <div class="section-head"><span class="section-num">03</span><h2>The two objectives</h2></div>
+    <p class="section-note">Same corpus, same tree, same tables - the only difference is which side of the (centre, context) pair does the predicting, and that difference is what section 10 turns out to hinge on.</p>
+
+    <h3>Skip-gram</h3>
+    <p class="body-text">Centre predicts context. One <span class="mono">(centre, context)</span> pair is one training example. <span class="mono">word_emb[centre]</span> is updated; the context word goes through <span class="mono">node_emb</span> along its Huffman path.</p>
+
+    <h3>CBOW</h3>
+    <p class="body-text">Averaged context predicts centre. One whole window is one training example. <span class="mono">word_emb</span> of every context word is updated at <span class="mono">1/(2R)</span> each; the centre goes through <span class="mono">node_emb</span>.</p>
+
+    <div class="warn">
+      <span class="w-title">The spine of this page</span>
+      In CBOW a word's evaluated vector is only ever updated from windows where it sits in <strong>context</strong>. Its own occurrence as a centre never touches <span class="mono">word_emb</span> - that pass through the network only ever writes to <span class="mono">node_emb</span>, which gets thrown away.
+    </div>
+  </section>
+
+  <section id="softmax">
+    <div class="section-head"><span class="section-num">04</span><h2>Hierarchical softmax over the Huffman tree</h2></div>
+    <p class="section-note">Softmax over V = 71,290 becomes a walk down a binary tree: one sigmoid per node on the path, loss is masked BCE over that path. The tree is built once, on the original counts - subsampling in section 06 never touches it.</p>
+
+    <div class="formula-box">
+      <div class="f-title">One softmax call becomes one tree walk</div>
+      <div class="f-line">P(w | h) = Π<sub>node ∈ path(w)</sub> σ( ± node_emb<sub>node</sub> · h )&nbsp;&nbsp;&nbsp;&nbsp;<span class="f-comment">sign flips per left/right turn</span></div>
+      <div class="f-line">loss = − Σ<sub>node</sub> mask<sub>node</sub> · [ code·log σ(x) + (1−code)·log(1−σ(x)) ]</div>
+      <div class="f-line">depth: min 4 · max 22 · frequency-weighted avg <strong>10.65</strong>&nbsp;&nbsp;&nbsp;&nbsp;<span class="f-comment">a balanced tree would average 16.12 - frequent words get short codes, which is where the speedup comes from</span></div>
+      <div class="f-line">zero-learning baseline = avg depth × ln 2 ≈ 10.65 × 0.693 ≈ <strong>7.38 nats</strong>&nbsp;&nbsp;&nbsp;&nbsp;<span class="f-comment">expected loss if every sigmoid sits at 0.5 - the number a healthy run should fall well below</span></div>
+    </div>
+  </section>
+
+  <section id="windows">
+    <div class="section-head"><span class="section-num">05</span><h2>Window sampling</h2></div>
+    <p class="section-note">The radius is not fixed at 5 - it is redrawn per centre, and that single design choice is what makes skip-gram cost 6x more steps than CBOW for the same corpus.</p>
+
+    <div class="formula-box">
+      <div class="f-title">Radius draw</div>
+      <div class="f-line">for each centre:&nbsp;&nbsp;R ~ Uniform{1..5}</div>
+      <div class="f-line">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;pair with R words left and R words right</div>
+      <div class="f-line">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;pairs from this centre = 2R</div>
+      <div class="f-line">E[2R] = window + 1 = 6&nbsp;&nbsp;&nbsp;&nbsp;<span class="f-comment">exact, since E[R] = (W+1)/2</span></div>
+    </div>
+
+    <div class="diagram-card">
+      <div class="strip tokens" aria-hidden="true" style="grid-template-columns:repeat(11,1fr)">
+        <div class="cell">−5</div><div class="cell">−4</div><div class="cell">−3</div><div class="cell">−2</div><div class="cell">−1</div>
+        <div class="cell centre">c</div>
+        <div class="cell">+1</div><div class="cell">+2</div><div class="cell">+3</div><div class="cell">+4</div><div class="cell">+5</div>
+      </div>
+      <div class="win-row">
+        <div class="win-label mono">R = 1</div>
+        <div class="win-grid strip window" style="grid-template-columns:repeat(11,1fr)">
+          <div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div>
+          <div class="cell active">−1</div><div class="cell active centre-active">c</div><div class="cell active">+1</div>
+          <div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div>
+        </div>
+      </div>
+      <div class="win-row">
+        <div class="win-label mono">R = 3</div>
+        <div class="win-grid strip window" style="grid-template-columns:repeat(11,1fr)">
+          <div class="cell"></div><div class="cell"></div>
+          <div class="cell active">−3</div><div class="cell active">−2</div><div class="cell active">−1</div>
+          <div class="cell active centre-active">c</div>
+          <div class="cell active">+1</div><div class="cell active">+2</div><div class="cell active">+3</div>
+          <div class="cell"></div><div class="cell"></div>
+        </div>
+      </div>
+      <div class="win-row">
+        <div class="win-label mono">R = 5</div>
+        <div class="win-grid strip window" style="grid-template-columns:repeat(11,1fr)">
+          <div class="cell active">−5</div><div class="cell active">−4</div><div class="cell active">−3</div><div class="cell active">−2</div><div class="cell active">−1</div>
+          <div class="cell active centre-active">c</div>
+          <div class="cell active">+1</div><div class="cell active">+2</div><div class="cell active">+3</div><div class="cell active">+4</div><div class="cell active">+5</div>
+        </div>
+      </div>
+      <div class="diagram-caption mono">Radius redrawn fresh per centre, uniform on {1..5} - not a schedule, not per-epoch. Three independent draws for the same centre would rarely look this different, but they can.</div>
+    </div>
+
+    <p class="body-text" style="margin-top:16px;">So one pass = 16,718,844 × 6 = <strong>100,313,064</strong> pairs, /16 = <strong>6,269,566</strong> steps for skip-gram. CBOW is one example per token: 16,718,844 / 16 = <strong>1,044,927</strong> steps.</p>
+
+    <div class="warn">
+      <span class="w-title">6x is a real asymmetry, not a bug</span>
+      By symmetry a word also lands in ~6 <em>other</em> words' windows, so both architectures give a word <span class="mono">6 × count(w)</span> <span class="mono">word_emb</span> updates per pass. The counts are equal between the two objectives - only what each update <em>contains</em> differs. The step-count gap is purely a batching artifact of skip-gram exploding one window into 2R separate examples.
+    </div>
+  </section>
+
+  <section id="subsampling">
+    <div class="section-head"><span class="section-num">06</span><h2>Subsampling (from 2013b)</h2></div>
+    <p class="section-note">A per-occurrence coin flip on the training stream only - vocab and the Huffman tree both stay built on the original, unsubsampled counts.</p>
+
+    <div class="formula-box">
+      <div class="f-title">Keep probability</div>
+      <div class="f-line">keep(w) = min( 1, √(t / f(w)) )&nbsp;&nbsp;&nbsp;&nbsp;<span class="f-comment">t = 1e-5, f(w) = count(w) / n, redrawn every pass</span></div>
+      <div class="f-line">cutoff: keep(w) = 1 when count(w) ≤ t·n = <strong>167</strong>&nbsp;&nbsp;&nbsp;&nbsp;<span class="f-comment">63,116 of 71,290 words (88.5%) sit below it, but are only 10.3% of tokens</span></div>
+    </div>
+
+    <div class="tbl-wrap">
+      <table>
+        <thead>
+          <tr><th>word</th><th class="num">count</th><th class="num">keep</th><th class="num">survives</th></tr>
+        </thead>
+        <tbody>
+          <tr><td class="sym">the</td><td class="num">1,061,396</td><td class="num">0.0126</td><td class="num">13,321</td></tr>
+          <tr><td class="sym">of</td><td class="num">593,677</td><td class="num">0.0168</td><td class="num">9,963</td></tr>
+          <tr><td class="sym">war</td><td class="num">14,629</td><td class="num">0.1069</td><td class="num">1,564</td></tr>
+          <tr><td class="sym">athens</td><td class="num">576</td><td class="num">0.5388</td><td class="num">310</td></tr>
+          <tr><td class="sym">walking</td><td class="num">283</td><td class="num">0.7686</td><td class="num">218</td></tr>
+          <tr><td class="sym">acropolis</td><td class="num">76</td><td class="num">1.0000</td><td class="num">76</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p class="body-text" style="margin-top:16px;">Corpus-wide: 4,669,144 of 16,718,844 survive = <strong>27.9%</strong>.</p>
+
+    <div class="warn">
+      <span class="w-title">Square root, not subtraction</span>
+      Survivors scale as <span class="mono">√(t·f)</span>, so subsampling takes the <strong>square root</strong> of frequency differences rather than removing words outright. <span class="mono">the</span> is 3,751x <span class="mono">walking</span> in raw count and only 61x after - and √3751 ≈ 61.2, exactly.
+    </div>
+  </section>
+
+  <section id="negsample">
+    <div class="section-head"><span class="section-num">07</span><h2>Negative sampling (from 2013b)</h2></div>
+    <p class="section-note">The other half of 2013b. Subsampling thins the stream; negative sampling replaces the output layer outright - and gives up being a probability model to do it.</p>
+
+    <p class="body-text">A softmax denominator does quiet work: raise one word's score and every other word's probability falls automatically, because they all share the same normaliser. Section 04's tree keeps that property while making it cheap. Negative sampling deletes the denominator instead, and with it that automatic downward pressure - so the pressure has to be supplied by hand, by naming a few words and saying "not this one". That is the entire purpose of the negatives.</p>
+
+    <p class="body-text">One <span class="mono">V</span>-way classification becomes <span class="mono">k+1</span> independent yes/no questions. No competition between slots, no argmax, no winner - every slot gets its own sigmoid and every one contributes to the loss.</p>
+
+    <div class="formula-box">
+      <div class="f-title">Objective and noise distribution</div>
+      <div class="f-line">L = − log σ( v<sub>pos</sub> · h ) − Σ<sub>i=1..k</sub> log σ( −v<sub>neg i</sub> · h )&nbsp;&nbsp;&nbsp;&nbsp;<span class="f-comment">the minus inside the second σ is what pushes those scores down</span></div>
+      <div class="f-line">= binary cross-entropy over k+1 slots, labels <strong>[1, 0, 0, …, 0]</strong>&nbsp;&nbsp;&nbsp;&nbsp;<span class="f-comment">the same masked-BCE shape as section 04, with word rows instead of tree nodes and no mask needed</span></div>
+      <div class="f-line">P<sub>noise</sub>(w) = count(w)<sup>0.75</sup> / Σ count<sup>0.75</sup>&nbsp;&nbsp;&nbsp;&nbsp;<span class="f-comment">exponent is empirical - the paper gives no derivation</span></div>
+      <div class="f-line">zero-learning baseline = (k+1) × ln 2&nbsp;&nbsp;→&nbsp;&nbsp;<strong>4.16</strong> at k=5, <strong>11.09</strong> at k=15&nbsp;&nbsp;&nbsp;&nbsp;<span class="f-comment">the NS analogue of the 7.38 checkpoint; matched to six decimals at init</span></div>
+    </div>
+
+    <p class="body-text">Why <span class="mono">0.75</span> and not <span class="mono">1.0</span>: under the plain unigram almost every negative would be <span class="mono">the</span> or <span class="mono">of</span>, which the model separates immediately and then keeps re-learning. Under uniform, almost every negative would be an ultra-rare word it already separates. The exponent takes a square-ish root of the frequency differences, the same move subsampling makes in section 06.</p>
+
+    <div class="tbl-wrap">
+      <table>
+        <thead>
+          <tr><th>word</th><th class="num">unigram</th><th class="num">noise, ^0.75</th><th class="num">effect</th></tr>
+        </thead>
+        <tbody>
+          <tr><td class="sym">the</td><td class="num">0.063485</td><td class="num">0.014757</td><td class="num dim">4.3x down</td></tr>
+          <tr><td class="sym">of</td><td class="num">0.035509</td><td class="num">0.009545</td><td class="num dim">3.7x down</td></tr>
+          <tr><td class="sym">new</td><td class="num">0.001422</td><td class="num">0.000854</td><td class="num dim">1.7x down</td></tr>
+          <tr><td class="sym">york</td><td class="num">0.000314</td><td class="num">0.000275</td><td class="num dim">1.1x down</td></tr>
+          <tr><td class="sym">athens</td><td class="num">0.000034</td><td class="num">0.000052</td><td class="num dim">1.5x <strong>up</strong></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p class="body-text" style="margin-top:16px;">Implementation follows <span class="mono">word2vec.c</span>: the distribution is pre-expanded into a 10M-entry table, so a draw is one <span class="mono">randint</span> plus one gather rather than a normalisation per call. Shapes are <span class="mono">h (B, D)</span>, targets <span class="mono">(B, k+1)</span> with column 0 the true word, logits <span class="mono">(B, k+1)</span>. A negative colliding with the true word is not checked for, as in the original - at V = 71,290 it is rare and costs one slot.</p>
+
+    <div class="warn">
+      <span class="w-title">It stops being a language model</span>
+      Hierarchical softmax is a <strong>reparameterisation</strong> of the softmax: the probabilities still sum to 1. Negative sampling is not - nothing sums to anything. It is a discriminative surrogate that happens to produce usable vectors, which is why 2013b makes no perplexity claim for it.
+    </div>
+  </section>
+
+  <section id="results">
+    <div class="section-head"><span class="section-num">08</span><h2>Results</h2></div>
+    <p class="section-note">Analogy-task accuracy, baseline vs with-subsampling, both architectures. Sem/syn columns are the semantic and syntactic sub-scores behind each overall figure.</p>
+
+    <div class="tbl-wrap">
+      <table>
+        <thead>
+          <tr><th>Condition</th><th class="num">Skip-gram</th><th class="num">sem / syn</th><th class="num">CBOW</th><th class="num">sem / syn</th></tr>
+        </thead>
+        <tbody>
+          <tr><td class="sym">baseline</td><td class="num"><strong>14.8%</strong></td><td class="num dim">14.2 / 15.2</td><td class="num"><strong>9.1%</strong></td><td class="num dim">6.2 / 11.2</td></tr>
+          <tr><td class="sym">with subsampling</td><td class="num"><strong>22.4%</strong></td><td class="num dim">28.0 / 18.5</td><td class="num"><strong>16.3%</strong></td><td class="num dim">21.6 / 12.4</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p class="body-text" style="margin-top:16px;">Training time, baseline runs: skip-gram <strong>8.04h</strong>, CBOW <strong>2.22h</strong>.</p>
+
+    <p class="body-text">
+      <span class="tag ok">reproduced</span> skip-gram leads on semantic.
+      <span class="tag bad">not reproduced</span> CBOW is not competitive on syntactic (12.4 vs 18.5) - prime suspect is the 6x step gap from section 05.
+    </p>
+  </section>
+
+  <section id="regimes">
+    <div class="section-head"><span class="section-num">09</span><h2>The headline number is an average of two unlike regimes</h2></div>
+    <p class="section-note">Regrouping the analogy categories into named-entity (capital-common-countries, capital-world, city-in-state, currency, gram6-nationality-adjective) vs everything else changes the story completely.</p>
+
+    <div class="tbl-wrap">
+      <table>
+        <thead>
+          <tr><th>Category</th><th>Condition</th><th class="num">Skip-gram</th><th class="num">CBOW</th><th class="num">gap</th><th class="num">n</th></tr>
+        </thead>
+        <tbody>
+          <tr class="group-start"><td class="sym">named entity</td><td class="sym">before</td><td class="num">17.5%</td><td class="num">5.7%</td><td class="num">+11.8</td><td class="num dim">8,517</td></tr>
+          <tr><td class="sym">named entity</td><td class="sym">after</td><td class="num">33.7%</td><td class="num">26.1%</td><td class="num">+7.5</td><td class="num dim">-</td></tr>
+          <tr class="group-start"><td class="sym">common</td><td class="sym">before</td><td class="num">12.3%</td><td class="num">12.2%</td><td class="num">+0.0</td><td class="num dim">9,310</td></tr>
+          <tr><td class="sym">common</td><td class="sym">after</td><td class="num">12.2%</td><td class="num">7.3%</td><td class="num">+4.9</td><td class="num dim">-</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p class="body-text" style="margin-top:16px;">The entire skip-gram advantage lives in the named-entity half; the other half is a dead tie that CBOW reached at 6x less compute.</p>
+
+    <div class="warn">
+      <span class="w-title">Live hypothesis - undifferentiated credit assignment</span>
+      CBOW computes one error on the averaged <span class="mono">h</span> and hands the same <span class="mono">1/(2R)</span> share to every context word - in <em>the capital of ___ is athens</em>, <span class="mono">athens</span> gets exactly what <span class="mono">the</span> gets. It cannot express that one word did all the work. This hurts only where a single neighbour pins the window, which is what named entities are.
+    </div>
+  </section>
+
+  <section id="updates">
+    <div class="section-head"><span class="section-num">10</span><h2>Matched steps ≠ matched per-word updates</h2></div>
+    <p class="section-note">The subsampled run kept the same step budget the baseline used - but the stream feeding it was only 27.9% the size, so it silently made more passes over the surviving tokens.</p>
+
+    <div class="formula-box">
+      <div class="f-title">Passes, and where they land</div>
+      <div class="f-line">same step budget, stream = 27.9% of tokens&nbsp;&nbsp;→&nbsp;&nbsp;<strong>3.58 passes</strong>&nbsp;&nbsp;&nbsp;&nbsp;<span class="f-comment">1 / 0.279 ≈ 3.58</span></div>
+      <div class="f-line">each word's update count scales by keep(w) × 3.58</div>
+      <div class="f-line">break-even: keep(w) = 0.279&nbsp;&nbsp;→&nbsp;&nbsp;count = <strong>2,146</strong>&nbsp;&nbsp;&nbsp;&nbsp;<span class="f-comment">passes = 1/survival when the baseline is one pass</span></div>
+      <div class="f-line">count &lt; 2,146&nbsp;&nbsp;→&nbsp;&nbsp;up to 3.58x MORE updates&nbsp;&nbsp;&nbsp;&nbsp;<span class="f-comment">named-entity words live here</span></div>
+      <div class="f-line">count &gt; 2,146&nbsp;&nbsp;→&nbsp;&nbsp;fewer updates, down to 0.04x for "the"</div>
+    </div>
+
+    <div class="warn">
+      <span class="w-title">Confound moves levels, not gaps</span>
+      The experiment silently moved learning from frequent to rare words by up to <strong>90x</strong>. That explains why both models fell in the most frequent decile (CBOW −17.6, skip-gram −11.1) - but it was identical for both models, and an identical cause cannot produce a <em>difference</em> between them. The named-entity vs common gap in section 09 survives this confound; only the absolute levels are suspect.
+    </div>
+  </section>
+
+  <section id="nsvshs">
+    <div class="section-head"><span class="section-num">11</span><h2>Negative sampling vs hierarchical softmax</h2></div>
+    <p class="section-note">2013b's headline is that NEG-5 beats HS-Huffman by 12 points on the analogy task. Three full epochs on text8, every setting matched except the head, say that claim is half right - and that the missing half is a precondition the paper never states.</p>
+
+    <div class="tbl-wrap">
+      <table>
+        <thead>
+          <tr><th>Split</th><th class="num">HS</th><th class="num">NS k=5</th><th class="num">NS k=15</th></tr>
+        </thead>
+        <tbody>
+          <tr><td class="sym">semantic</td><td class="num">14.2%</td><td class="num">6.7%</td><td class="num">8.5%</td></tr>
+          <tr><td class="sym">syntactic</td><td class="num">15.2%</td><td class="num">11.4%</td><td class="num"><strong>18.2%</strong></td></tr>
+          <tr class="total"><td class="sym">total</td><td class="num">14.8%</td><td class="num">9.4%</td><td class="num">14.2%</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p class="body-text" style="margin-top:16px;"><strong>k = 5 was a misconfiguration.</strong> The paper recommends 5-20 negatives for small corpora and 2-5 for large ones; text8 is 16.7M words against their 1B, so 5 was the wrong end of the range. Raising it to 15 recovers nearly the whole 5.4-point deficit - and then the total stops being the interesting number, because NS k=15 <em>beats</em> HS on syntactic by 3.0 and <em>loses</em> on semantic by 5.7.</p>
+
+    <p class="body-text">Per category the split is stark. Up: <span class="mono">gram3-comparative</span> 19.9 → <strong>32.0</strong>, <span class="mono">family</span> 28.3 → <strong>35.7</strong>, <span class="mono">gram5-present-participle</span> 13.8 → <strong>19.7</strong>. Down: <span class="mono">capital-common-countries</span> 35.4 → <strong>25.3</strong>, <span class="mono">capital-world</span> 12.0 → <strong>5.0</strong>, <span class="mono">city-in-state</span> 13.3 → <strong>7.2</strong>. It is the section 09 regrouping again, arrived at from a different direction.</p>
+
+    <div class="tbl-wrap">
+      <table>
+        <thead>
+          <tr><th>Half</th><th class="num">n</th><th class="num">HS</th><th class="num">NS k=15</th><th class="num">gap</th></tr>
+        </thead>
+        <tbody>
+          <tr><td class="sym">named entity</td><td class="num dim">8,517</td><td class="num">17.5%</td><td class="num">12.2%</td><td class="num">HS +5.3</td></tr>
+          <tr><td class="sym">common</td><td class="num dim">9,310</td><td class="num">12.3%</td><td class="num">16.0%</td><td class="num">NS +3.8</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>Where the crossover sits</h3>
+    <p class="section-note">Questions bucketed by the count of their rarest word - the binding one, since all four vectors have to be good. At k=5 this gap was flat across every bucket. At k=15 it becomes monotone and changes sign.</p>
+
+    <div class="diagram-card">
+      <div class="xover-key">
+        <span class="l"><b>&#9664; HS ahead</b></span>
+        <span class="mid">min-count of the question's rarest word</span>
+        <span class="r"><b>NS ahead &#9654;</b></span>
+      </div>
+      <div class="xover">
+        <div class="xover-row"><div class="xover-label">5 - 8</div><div class="xover-track"><i class="hs" style="width:14.3%"></i></div><div class="xover-val hs">HS +2.6</div></div>
+        <div class="xover-row"><div class="xover-label">8 - 15</div><div class="xover-track"><i class="hs" style="width:19.2%"></i></div><div class="xover-val hs">HS +3.5</div></div>
+        <div class="xover-row"><div class="xover-label">15 - 20</div><div class="xover-track"><i class="hs" style="width:21.4%"></i></div><div class="xover-val hs">HS +3.9</div></div>
+        <div class="xover-row"><div class="xover-label">20 - 34</div><div class="xover-track"><i class="hs" style="width:45.0%"></i></div><div class="xover-val hs">HS +8.2</div></div>
+        <div class="xover-row"><div class="xover-label">34 - 54</div><div class="xover-track"><i class="hs" style="width:10.4%"></i></div><div class="xover-val hs">HS +1.9</div></div>
+        <div class="xover-row"><div class="xover-label">54 - 79</div><div class="xover-track"><i class="hs" style="width:2.2%"></i></div><div class="xover-val hs">HS +0.4</div></div>
+        <div class="xover-row"><div class="xover-label">79 - 130</div><div class="xover-track"><i class="ns" style="width:1.6%"></i></div><div class="xover-val ns">NS +0.3</div></div>
+        <div class="xover-row"><div class="xover-label">130 - 211</div><div class="xover-track"><i class="ns" style="width:15.9%"></i></div><div class="xover-val ns">NS +2.9</div></div>
+        <div class="xover-row"><div class="xover-label">211 - 400</div><div class="xover-track"><i class="ns" style="width:20.9%"></i></div><div class="xover-val ns">NS +3.8</div></div>
+        <div class="xover-row"><div class="xover-label">400 - 7896</div><div class="xover-track"><i class="ns" style="width:43.3%"></i></div><div class="xover-val ns">NS +7.9</div></div>
+      </div>
+      <div class="diagram-caption mono">Ten equal buckets, 1,783 questions each. Sign flips between min-count 79 and 130. Longest bars: HS +8.2, NS +7.9.</div>
+    </div>
+
+    <div class="warn">
+      <span class="w-title">Why the crossover exists - shared nodes vs private rows</span>
+      A rare word gets a <strong>long</strong> Huffman code, and every node on that path is shared with other words, so under HS a rare word is trained partly by its neighbours in the tree. Under NS each word owns one private output row, updated only when the word itself occurs. Raising <span class="mono">k</span> makes the discrimination task harder and sharpens the words that have enough occurrences to benefit - it cannot manufacture data for the ones that do not.
+    </div>
+
+    <p class="body-text" style="margin-top:16px;">Which retro-explains the paper. On 1B words, text8's rare words are 60x more frequent, so this weakness barely shows. The unstated precondition on the 12-point claim is not corpus size as such but <strong>absolute occurrence count per word</strong>.</p>
+
+    <p class="body-text">
+      <span class="tag bad">not reproduced</span> on the paper's own metric at this scale - 14.2% against HS 14.8%, a difference around the noise floor.
+      <span class="tag ok">reproduced on half the vocabulary</span> NS wins clearly wherever the words have the counts to support it.
+    </p>
+
+    <div class="warn">
+      <span class="w-title">Loss is not the verdict, again</span>
+      NS drove its own objective far below its own baseline - mean <span class="mono">diff</span> near <strong>−2.15</strong> per decile against HS's <strong>−0.63</strong> - while producing worse vectors. Section 07's objective is a surrogate, and at k=5 an easy one: telling the true context from five random draws does not take much. The loss curve cannot rank these two heads.
+    </div>
+  </section>
+
+  <section id="lessons">
+    <div class="section-head"><span class="section-num">12</span><h2>Lessons</h2></div>
+    <p class="section-note">The failure modes that cost the most time re-implementing this paper from scratch.</p>
+    <div class="tbl-wrap">
+      <table>
+        <thead>
+          <tr><th>Lesson</th><th>Detail</th></tr>
+        </thead>
+        <tbody>
+          <tr><td class="sym">lr is per-example</td><td class="wrap">The paper's lr 0.025 is a <strong>per-example</strong> rate. Under B=256 batch-mean it behaves like 0.025/256 and produces no measurable learning in 10,000 steps. Check batch size before transferring any pre-2012 published rate.</td></tr>
+          <tr><td class="sym">sweeps pick unstable rates</td><td class="wrap">A short lr sweep picks <em>unstable</em> rates, not good ones. A 1000-step sweep ranked lr=2 as 2.7x better than lr=1; lr=2 diverged 1.1% into the epoch and lr=1 overtook it by 25k steps. Initial speed and stability are anti-correlated.</td></tr>
+          <tr><td class="sym">"absurd" ≠ "non-finite"</td><td class="wrap">An abort guard must trip on <em>absurd</em>, not on non-finite. A diverging run sits at finite losses like 1e26 for tens of thousands of steps. The guard used: <span class="mono">loss &gt; 5 × (avg huffman depth × ln2)</span>.</td></tr>
+          <tr><td class="sym">strip stopwords first</td><td class="wrap">Raw neighbour entropy measures English, not the word: every word's neighbour list is ~19/20 identical to the corpus top-20 because stopwords dominate. Strip the top-100 first.</td></tr>
+          <tr><td class="sym">short probes fail on accuracy too</td><td class="wrap">Already known: short sweeps mislead on <em>loss</em>. They mislead on <em>accuracy</em> as well, for a different reason. HS reaches 14.8% over a full epoch but only <strong>2.2%</strong> at one sixth of one on a fully compressed lr schedule - the gains arrive late. A 5-arm grid at 1M steps reproduced a +0.4 gap where the full epoch shows +5.4, and had to be discarded. Quality hypotheses here cost a full epoch each.</td></tr>
+          <tr><td class="sym">key runs by directory, not kind</td><td class="wrap">The bucket-analysis script keyed its results on <span class="mono">ck["kind"]</span>. Two skip-gram runs - HS and NS - collided, the second silently overwrote the first, and every cell printed a <span class="mono">+0.0</span> gap. It survived because the original use compared skip-gram against CBOW, where the kinds differ. A duplicate-label assert now guards it.</td></tr>
+          <tr><td class="sym">three ways to lose a run</td><td class="wrap">Wrap long runs in <span class="mono">caffeinate</span>, disable <span class="mono">AutomaticallyInstallMacOSUpdates</span>, and launch inside <span class="mono">tmux</span>. Runs died to idle sleep, to an auto-update reboot at 67.8% that <span class="mono">caffeinate</span> could not stop, and twice to the parent session exiting - <span class="mono">nohup</span> did not save it. The check that does: the process should show <span class="mono">PPID 1</span>. <span class="mono">setsid</span> does not exist on macOS.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <footer>
+    Source: personal implementation and evaluation notes, Mikolov et al. - <em>ICLR Workshop 2013</em> (skip-gram/CBOW, hierarchical softmax) and <em>NeurIPS 2013</em> (subsampling, negative sampling) - reconstructed from from-scratch training runs on text8, 2026. Companion to the Collobert &amp; Weston 2008 notation page.
+  </footer>
+
+</div>
