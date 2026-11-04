@@ -8,7 +8,7 @@ tracking.
 The point is not to code the papers. It is to sit inside each era's constraints
 long enough to feel why the next breakthrough had to happen.
 
-**Currently on:** Attention for NMT (Bahdanau, Cho & Bengio 2014). BPE (Sennrich et al. 2016) is paused and resumes after it.
+**Currently on:** Attention for NMT (Bahdanau, Cho & Bengio 2014). The toy reverse task is done; RNNsearch-50 is training on WMT14 En-Fr, with RNNencdec-50 next. BPE (Sennrich et al. 2016) resumes while they train.
 Findings so far are in [`reports/`](reports/).
 
 ## The arc
@@ -27,6 +27,7 @@ efficiency (FlashAttention, MoE, LoRA) -> alignment (RLHF, DPO) -> reasoning
 | A Unified Architecture for NLP (Collobert & Weston) | 2008 | [`notebooks/collobert_and_weston_2008.ipynb`](notebooks/collobert_and_weston_2008.ipynb) |
 | Efficient Estimation of Word Representations (Mikolov et al.) | 2013 | [`notebooks/mikolov-2013a.ipynb`](notebooks/mikolov-2013a.ipynb) + [`scripts/`](scripts/) |
 | GloVe: Global Vectors for Word Representation (Pennington et al.) | 2014 | [`notebooks/GloVe.ipynb`](notebooks/GloVe.ipynb) |
+| Neural Machine Translation by Jointly Learning to Align and Translate (Bahdanau et al.) - in progress | 2014 | [`notebooks/bahdanau-2014.ipynb`](notebooks/bahdanau-2014.ipynb) + [`scripts/train_bahdanau.py`](scripts/train_bahdanau.py) |
 
 ## Structure
 
