@@ -1,0 +1,1551 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>First-Principles Guide: Vanilla RNN to Seq2Seq, Attention & Bi-RNN</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com/3.4.16"></script>
+    <!-- Google Fonts: Inter & JetBrains Mono -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- KaTeX for fast, crisp math rendering -->
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body {
+            background-color: #09090b;
+            color: #e4e4e7;
+        }
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #18181b;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #3f3f46;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #52525b;
+        }
+        .shape-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            padding: 0.15rem 0.55rem;
+            border-radius: 0.375rem;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.78rem;
+            font-weight: 600;
+            border: 1px solid rgba(255,255,255,0.12);
+            background: rgba(24, 24, 27, 0.9);
+            transition: all 0.2s ease;
+        }
+        .shape-pill:hover {
+            border-color: rgba(99, 102, 241, 0.6);
+            transform: translateY(-1px);
+        }
+        .katex { font-size: 1.05em; }
+        .node-active {
+            box-shadow: 0 0 0 2px #6366f1, 0 0 20px rgba(99, 102, 241, 0.35);
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col selection:bg-indigo-500/30 selection:text-indigo-200">
+
+    <!-- STICKY HEADER & GLOBAL DIMENSION CONFIGURATOR -->
+    <header class="sticky top-0 z-50 bg-zinc-950/90 backdrop-blur-md border-b border-zinc-800/80 shadow-xl">
+        <div class="max-w-7xl mx-auto px-4 py-3">
+            <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+                <!-- Title & Subtitle -->
+                <div>
+                    <div class="flex items-center gap-2.5">
+                        <span class="px-2 py-0.5 text-xs font-mono font-bold uppercase tracking-wider bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 rounded">First Principles</span>
+                        <h1 class="text-lg sm:text-xl font-bold text-white tracking-tight">Vanilla RNN $\to$ Seq2Seq, Attention & Bi-RNN</h1>
+                    </div>
+                    <p class="text-xs text-zinc-400 mt-0.5">Batch-First Right-Multiplication ($x_t W_{xh}$) • Interactive English + PyTorch Tensor Shape Reference</p>
+                </div>
+
+                <!-- Live Tensor Dimension Configurator -->
+                <div class="bg-zinc-900/90 border border-zinc-800 rounded-xl p-2 flex flex-wrap items-center gap-2 sm:gap-3">
+                    <span class="text-[11px] font-mono uppercase tracking-wider text-zinc-400 px-1.5 flex items-center gap-1">
+                        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> Live Shapes:
+                    </span>
+
+                    <!-- B -->
+                    <label class="flex items-center gap-1 bg-zinc-950 px-2 py-1 rounded border border-zinc-800 text-xs font-mono">
+                        <span class="text-indigo-400 font-bold" title="Batch Size">B=</span>
+                        <input type="number" id="dim-B" value="32" min="1" max="512" class="w-11 bg-transparent text-white focus:outline-none text-right">
+                    </label>
+                    <!-- T_in -->
+                    <label class="flex items-center gap-1 bg-zinc-950 px-2 py-1 rounded border border-zinc-800 text-xs font-mono">
+                        <span class="text-sky-400 font-bold" title="Encoder Source Sequence Length">T_in=</span>
+                        <input type="number" id="dim-Tin" value="3" min="1" max="100" class="w-9 bg-transparent text-white focus:outline-none text-right">
+                    </label>
+                    <!-- T_out -->
+                    <label class="flex items-center gap-1 bg-zinc-950 px-2 py-1 rounded border border-zinc-800 text-xs font-mono">
+                        <span class="text-cyan-400 font-bold" title="Decoder Target Sequence Length">T_out=</span>
+                        <input type="number" id="dim-Tout" value="3" min="1" max="100" class="w-9 bg-transparent text-white focus:outline-none text-right">
+                    </label>
+                    <!-- D -->
+                    <label class="flex items-center gap-1 bg-zinc-950 px-2 py-1 rounded border border-zinc-800 text-xs font-mono">
+                        <span class="text-amber-400 font-bold" title="Token Embedding Dimension">D=</span>
+                        <input type="number" id="dim-D" value="128" min="8" max="4096" step="8" class="w-12 bg-transparent text-white focus:outline-none text-right">
+                    </label>
+                    <!-- H -->
+                    <label class="flex items-center gap-1 bg-zinc-950 px-2 py-1 rounded border border-zinc-800 text-xs font-mono">
+                        <span class="text-emerald-400 font-bold" title="Hidden State Dimension">H=</span>
+                        <input type="number" id="dim-H" value="256" min="8" max="4096" step="8" class="w-12 bg-transparent text-white focus:outline-none text-right">
+                    </label>
+                    <!-- A -->
+                    <label class="flex items-center gap-1 bg-zinc-950 px-2 py-1 rounded border border-zinc-800 text-xs font-mono">
+                        <span class="text-fuchsia-400 font-bold" title="Attention / Search Space Dimension">A=</span>
+                        <input type="number" id="dim-A" value="256" min="8" max="4096" step="8" class="w-12 bg-transparent text-white focus:outline-none text-right">
+                    </label>
+                    <!-- V -->
+                    <label class="flex items-center gap-1 bg-zinc-950 px-2 py-1 rounded border border-zinc-800 text-xs font-mono">
+                        <span class="text-rose-400 font-bold" title="Vocabulary Size">V=</span>
+                        <input type="number" id="dim-V" value="5000" min="10" max="100000" step="100" class="w-14 bg-transparent text-white focus:outline-none text-right">
+                    </label>
+                </div>
+            </div>
+
+            <!-- Navigation Tabs -->
+            <nav class="flex items-center gap-1.5 mt-3 overflow-x-auto pb-1 no-scrollbar" id="module-tabs">
+                <button onclick="switchTab(1)" id="tab-btn-1" class="tab-btn px-3.5 py-2 rounded-lg text-xs sm:text-sm font-medium whitespace-nowrap transition-all bg-indigo-600 text-white shadow-lg shadow-indigo-600/20">
+                    1. Vanilla RNN & BPTT
+                </button>
+                <button onclick="switchTab(2)" id="tab-btn-2" class="tab-btn px-3.5 py-2 rounded-lg text-xs sm:text-sm font-medium whitespace-nowrap transition-all bg-zinc-900 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800">
+                    2. Seq2Seq & The Bottleneck
+                </button>
+                <button onclick="switchTab(3)" id="tab-btn-3" class="tab-btn px-3.5 py-2 rounded-lg text-xs sm:text-sm font-medium whitespace-nowrap transition-all bg-zinc-900 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800">
+                    3. Attention & (B, 1, H) Trick
+                </button>
+                <button onclick="switchTab(4)" id="tab-btn-4" class="tab-btn px-3.5 py-2 rounded-lg text-xs sm:text-sm font-medium whitespace-nowrap transition-all bg-zinc-900 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800">
+                    4. Luong vs. Bahdanau (MLP/XOR)
+                </button>
+                <button onclick="switchTab(5)" id="tab-btn-5" class="tab-btn px-3.5 py-2 rounded-lg text-xs sm:text-sm font-medium whitespace-nowrap transition-all bg-zinc-900 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800">
+                    5. Bi-RNN & State Bridging
+                </button>
+                <button onclick="switchTab(6)" id="tab-btn-6" class="tab-btn px-3.5 py-2 rounded-lg text-xs sm:text-sm font-medium whitespace-nowrap transition-all bg-zinc-900 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800">
+                    6. Variable Length & Dynamic Batching
+                </button>
+                <button onclick="switchTab(7)" id="tab-btn-7" class="tab-btn px-3.5 py-2 rounded-lg text-xs sm:text-sm font-medium whitespace-nowrap transition-all bg-zinc-900 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800">
+                    7. Toy Experiment: Debug &amp; Analysis Flow
+                </button>
+            </nav>
+        </div>
+    </header>
+
+    <!-- MAIN CONTENT CONTAINER -->
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 py-6 space-y-8">
+
+        <!-- ========================================== -->
+        <!-- MODULE 1: VANILLA RNN, UNROLLING & BPTT    -->
+        <!-- ========================================== -->
+        <section id="module-1" class="module-section space-y-6">
+            <div class="bg-gradient-to-r from-indigo-950/40 via-zinc-900 to-zinc-900 border border-indigo-500/30 rounded-2xl p-6">
+                <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div>
+                        <span class="text-xs font-mono uppercase text-indigo-400 tracking-wider">Module 01 • Core Recurrence</span>
+                        <h2 class="text-2xl font-bold text-white mt-1">Vanilla RNN, Time Unrolling & Shared Weights</h2>
+                        <p class="text-sm text-zinc-300 mt-1">
+                            An RNN is not $T$ separate layers—it is **a single cell** called repeatedly in a `for t in range(T):` loop using the **exact same weight matrices** ($W_{xh}, W_{hh}, W_{hy}$).
+                        </p>
+                    </div>
+                    <div class="bg-zinc-950/80 border border-zinc-800 rounded-xl p-3.5 shrink-0">
+                        <div class="text-xs font-mono text-zinc-400 mb-1">Batch-First Equations (Right-Mul):</div>
+                        <div class="text-sm text-emerald-300">
+                            $$h_t = \tanh(x_t W_{xh} + h_{t-1} W_{hh} + b_h)$$
+                            $$\hat{y}_t = h_t W_{hy} + b_y$$
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Interactive Unrolling Simulator -->
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                <!-- Left 7 Cols: Interactive Unrolled Graph -->
+                <div class="lg:col-span-7 bg-zinc-900 border border-zinc-800 rounded-2xl p-5 flex flex-col justify-between">
+                    <div>
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-base font-semibold text-white flex items-center gap-2">
+                                <span class="w-2.5 h-2.5 rounded-full bg-indigo-500"></span>
+                                Interactive Unrolled Time-Steps ($T = 3$)
+                            </h3>
+                            <span class="text-xs text-zinc-400 font-mono">Click any step to inspect</span>
+                        </div>
+
+                        <!-- Step Selector Buttons -->
+                        <div class="grid grid-cols-3 gap-3 mb-6">
+                            <button onclick="selectRnnStep(1)" id="rnn-step-btn-1" class="rnn-step-btn p-3 rounded-xl border border-indigo-500 bg-indigo-500/10 text-left transition-all node-active">
+                                <div class="flex items-center justify-between">
+                                    <span class="text-xs font-mono text-indigo-300 font-bold">Step t = 1</span>
+                                    <span class="text-[11px] font-mono px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-300">x₁ = "banks"</span>
+                                </div>
+                                <div class="mt-2 text-xs text-zinc-300">Uses $h_0$ (zeros) + $x_1$ to compute $h_1$.</div>
+                            </button>
+                            <button onclick="selectRnnStep(2)" id="rnn-step-btn-2" class="rnn-step-btn p-3 rounded-xl border border-zinc-800 bg-zinc-950/60 text-left transition-all hover:border-zinc-700">
+                                <div class="flex items-center justify-between">
+                                    <span class="text-xs font-mono text-indigo-300 font-bold">Step t = 2</span>
+                                    <span class="text-[11px] font-mono px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-300">x₂ = "are"</span>
+                                </div>
+                                <div class="mt-2 text-xs text-zinc-300">Uses $h_1$ + $x_2$ with **same** $W_{xh}, W_{hh}$.</div>
+                            </button>
+                            <button onclick="selectRnnStep(3)" id="rnn-step-btn-3" class="rnn-step-btn p-3 rounded-xl border border-zinc-800 bg-zinc-950/60 text-left transition-all hover:border-zinc-700">
+                                <div class="flex items-center justify-between">
+                                    <span class="text-xs font-mono text-indigo-300 font-bold">Step t = 3</span>
+                                    <span class="text-[11px] font-mono px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-300">x₃ = "closed"</span>
+                                </div>
+                                <div class="mt-2 text-xs text-zinc-300">Outputs final summary state $h_3$.</div>
+                            </button>
+                        </div>
+
+                        <!-- Visual Unrolled Flow Diagram -->
+                        <div class="bg-zinc-950 border border-zinc-800/90 rounded-xl p-4 font-mono text-xs overflow-x-auto">
+                            <div class="min-w-[520px] space-y-3">
+                                <!-- Output Row -->
+                                <div class="grid grid-cols-3 gap-4 text-center pl-14">
+                                    <div class="p-2 rounded bg-rose-500/10 border border-rose-500/30 text-rose-300">
+                                        ŷ₁ = h₁·W_hy <br><span class="live-shape" data-sym="(B, V)"></span>
+                                    </div>
+                                    <div class="p-2 rounded bg-rose-500/10 border border-rose-500/30 text-rose-300">
+                                        ŷ₂ = h₂·W_hy <br><span class="live-shape" data-sym="(B, V)"></span>
+                                    </div>
+                                    <div class="p-2 rounded bg-rose-500/10 border border-rose-500/30 text-rose-300">
+                                        ŷ₃ = h₃·W_hy <br><span class="live-shape" data-sym="(B, V)"></span>
+                                    </div>
+                                </div>
+
+                                <!-- Arrows Up -->
+                                <div class="grid grid-cols-3 gap-4 text-center pl-14 text-zinc-500">
+                                    <div>▲ W_hy <span class="live-shape" data-sym="(H, V)"></span></div>
+                                    <div>▲ W_hy (Shared)</div>
+                                    <div>▲ W_hy (Shared)</div>
+                                </div>
+
+                                <!-- Hidden State Row -->
+                                <div class="flex items-center justify-between gap-2">
+                                    <div class="p-2 rounded bg-zinc-900 border border-zinc-700 text-zinc-400 shrink-0 text-center">
+                                        h₀ (Zeros)<br><span class="live-shape" data-sym="(B, H)"></span>
+                                    </div>
+                                    <div class="text-emerald-400 font-bold">──►</div>
+                                    <div class="p-2.5 rounded-lg bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 flex-1 text-center">
+                                        <strong>[RNN Cell]</strong> → h₁<br><span class="live-shape" data-sym="(B, H)"></span>
+                                    </div>
+                                    <div class="text-emerald-400 font-bold">──►</div>
+                                    <div class="p-2.5 rounded-lg bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 flex-1 text-center">
+                                        <strong>[RNN Cell]</strong> → h₂<br><span class="live-shape" data-sym="(B, H)"></span>
+                                    </div>
+                                    <div class="text-emerald-400 font-bold">──►</div>
+                                    <div class="p-2.5 rounded-lg bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 flex-1 text-center">
+                                        <strong>[RNN Cell]</strong> → h₃<br><span class="live-shape" data-sym="(B, H)"></span>
+                                    </div>
+                                </div>
+
+                                <!-- Arrows Up from Input -->
+                                <div class="grid grid-cols-3 gap-4 text-center pl-14 text-zinc-500">
+                                    <div>▲ W_xh <span class="live-shape" data-sym="(D, H)"></span></div>
+                                    <div>▲ W_xh (Shared)</div>
+                                    <div>▲ W_xh (Shared)</div>
+                                </div>
+
+                                <!-- Input Row -->
+                                <div class="grid grid-cols-3 gap-4 text-center pl-14">
+                                    <div class="p-2 rounded bg-amber-500/10 border border-amber-500/30 text-amber-300">
+                                        x₁ ("banks")<br><span class="live-shape" data-sym="(B, D)"></span>
+                                    </div>
+                                    <div class="p-2 rounded bg-amber-500/10 border border-amber-500/30 text-amber-300">
+                                        x₂ ("are")<br><span class="live-shape" data-sym="(B, D)"></span>
+                                    </div>
+                                    <div class="p-2 rounded bg-amber-500/10 border border-amber-500/30 text-amber-300">
+                                        x₃ ("closed")<br><span class="live-shape" data-sym="(B, D)"></span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Dynamic Step Trace Box -->
+                    <div id="rnn-step-detail" class="mt-4 p-4 rounded-xl bg-indigo-950/30 border border-indigo-500/30 text-sm space-y-2">
+                        <!-- Populated by JS -->
+                    </div>
+                </div>
+
+                <!-- Right 5 Cols: Tensor Shape Table & BPTT -->
+                <div class="lg:col-span-5 space-y-6">
+                    <!-- Matrix Shape Breakdown -->
+                    <div class="bg-zinc-900 border border-zinc-800 rounded-2xl p-5">
+                        <h3 class="text-base font-semibold text-white mb-3">Exact Tensor & Weight Shapes</h3>
+                        <div class="space-y-2.5 text-xs sm:text-sm">
+                            <div class="flex items-center justify-between p-2.5 rounded-lg bg-zinc-950 border border-zinc-800/80">
+                                <span>Full Batched Input $X$</span>
+                                <span class="shape-pill text-amber-300 live-shape" data-sym="(B, T_in, D)"></span>
+                            </div>
+                            <div class="flex items-center justify-between p-2.5 rounded-lg bg-zinc-950 border border-zinc-800/80">
+                                <span>Single Step Input $x_t = X[:, t, :]$</span>
+                                <span class="shape-pill text-amber-300 live-shape" data-sym="(B, D)"></span>
+                            </div>
+                            <div class="flex items-center justify-between p-2.5 rounded-lg bg-zinc-950 border border-zinc-800/80">
+                                <span>Input-to-Hidden Weight $W_{xh}$</span>
+                                <span class="shape-pill text-indigo-300 live-shape" data-sym="(D, H)"></span>
+                            </div>
+                            <div class="flex items-center justify-between p-2.5 rounded-lg bg-zinc-950 border border-zinc-800/80">
+                                <span>Hidden-to-Hidden Weight $W_{hh}$</span>
+                                <span class="shape-pill text-emerald-300 live-shape" data-sym="(H, H)"></span>
+                            </div>
+                            <div class="flex items-center justify-between p-2.5 rounded-lg bg-zinc-950 border border-zinc-800/80">
+                                <span>Hidden State $h_t$ & Bias $b_h$</span>
+                                <span class="shape-pill text-emerald-300 live-shape" data-sym="(B, H)"></span>
+                            </div>
+                            <div class="flex items-center justify-between p-2.5 rounded-lg bg-zinc-950 border border-zinc-800/80">
+                                <span>Hidden-to-Output Weight $W_{hy}$</span>
+                                <span class="shape-pill text-rose-300 live-shape" data-sym="(H, V)"></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- BPTT Intuition Box -->
+                    <div class="bg-zinc-900 border border-zinc-800 rounded-2xl p-5">
+                        <h3 class="text-base font-semibold text-white mb-2 flex items-center gap-2">
+                            <span class="px-2 py-0.5 text-xs bg-amber-500/20 text-amber-300 border border-amber-500/30 rounded font-mono">BPTT</span>
+                            Shared Weights = Gradient Accumulation
+                        </h3>
+                        <p class="text-xs sm:text-sm text-zinc-300 leading-relaxed">
+                            Because $W_{xh}$ and $W_{hh}$ across every timestep $t=1 \dots T$ are **shared**, their gradient in Backpropagation Through Time (BPTT) is the **sum** of each step contribution:
+                        </p>
+                        <div class="my-3 p-3 bg-zinc-950 rounded-xl border border-zinc-800 text-center text-xs sm:text-sm">
+                            $$\frac{\partial \mathcal{L}}{\partial W_{hh}} = \sum_{t=1}^{T} \frac{\partial \mathcal{L}_t}{\partial W_{hh}} \quad \text{where} \quad \frac{\partial h_t}{\partial h_{t-1}} = \text{diag}(1 - h_t^2) \cdot W_{hh}^T$$
+                        </div>
+                        <p class="text-xs text-zinc-400">
+                            💡 <strong>First-Principles Catch:</strong> In long sequences $W_{hh}^T$ gets multiplied again and again ($\prod_{k} W_{hh}^T$), which makes gradients vanish or explode!
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ========================================== -->
+        <!-- MODULE 2: SEQ2SEQ & THE BOTTLENECK         -->
+        <!-- ========================================== -->
+        <section id="module-2" class="module-section hidden space-y-6">
+            <div class="bg-gradient-to-r from-emerald-950/40 via-zinc-900 to-zinc-900 border border-emerald-500/30 rounded-2xl p-6">
+                <span class="text-xs font-mono uppercase text-emerald-400 tracking-wider">Module 02 • Encoder-Decoder Architecture</span>
+                <h2 class="text-2xl font-bold text-white mt-1">Seq2Seq Decoupling & The Two Encoder Outputs</h2>
+                <p class="text-sm text-zinc-300 mt-1">
+                    In a vanilla RNN every input token produces an output ($T_{in} = T_{out}$). In Machine Translation the input length ($T_{in}$) and output length ($T_{out}$) can differ — so we use **2 separate RNNs** (Encoder & Decoder).
+                </p>
+            </div>
+
+            <!-- Crucial Distinction: The 2 Things Encoder Gives -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="bg-zinc-900 border border-sky-500/40 rounded-2xl p-5 relative overflow-hidden">
+                    <div class="flex items-center justify-between mb-3">
+                        <span class="px-2.5 py-1 text-xs font-mono font-bold bg-sky-500/20 text-sky-300 rounded-md border border-sky-500/30">Output #1: Memory Bank (On the Table)</span>
+                        <span class="shape-pill text-sky-300 live-shape" data-sym="(B, T_in, H)"></span>
+                    </div>
+                    <h3 class="text-lg font-bold text-white">$H_{enc} = \text{stack}([h_1, h_2, \dots, h_{T_{in}}])$</h3>
+                    <p class="text-sm text-zinc-300 mt-2 leading-relaxed">
+                        The hidden states of **all encoder timesteps** are stacked on `dim=1` and kept aside on the table.
+                    </p>
+                    <div class="mt-3 p-3 rounded-xl bg-zinc-950 border border-zinc-800 text-xs text-amber-300 font-mono">
+                        ⚠️ Crucial Clarification: This $(B, T_{in}, H)$ tensor does NOT enter the Decoder RNN cell directly as input! It waits outside for the Attention query.
+                    </div>
+                </div>
+
+                <div class="bg-zinc-900 border border-emerald-500/40 rounded-2xl p-5 relative overflow-hidden">
+                    <div class="flex items-center justify-between mb-3">
+                        <span class="px-2.5 py-1 text-xs font-mono font-bold bg-emerald-500/20 text-emerald-300 rounded-md border border-emerald-500/30">Output #2: Final Summary State</span>
+                        <span class="shape-pill text-emerald-300 live-shape" data-sym="(B, H)"></span>
+                    </div>
+                    <h3 class="text-lg font-bold text-white">$h_{T_{in}}$ (e.g., $h_3$) $\longrightarrow s_0$</h3>
+                    <p class="text-sm text-zinc-300 mt-2 leading-relaxed">
+                        Only the **last step** hidden state $h_{T_{in}}$ of the Encoder. This enters the first Decoder cell `[Dec 1]` as the initial hidden state **$s_0$**!
+                    </p>
+                    <div class="mt-3 p-3 rounded-xl bg-zinc-950 border border-zinc-800 text-xs text-emerald-300 font-mono">
+                        ✅ Decoder Step 1 Input: Token $y_1 = \text{"<sos>"}$ $(B, D)$ comes from below, and $s_0 = h_3$ $(B, H)$ comes from the left!
+                    </div>
+                </div>
+            </div>
+
+            <!-- Interactive Toggle: Bottleneck Seq2Seq vs Attention Preview -->
+            <div class="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 space-y-5">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div>
+                        <h3 class="text-lg font-bold text-white">The Information Bottleneck Problem (Vanilla Seq2Seq)</h3>
+                        <p class="text-xs text-zinc-400">See what happens when we discard $H_{enc}$ $(B, T_{in}, H)$ and rely only on the last vector $h_3$ $(B, H)$ for the whole translation:</p>
+                    </div>
+                </div>
+
+                <!-- Bottleneck Visual Diagram -->
+                <div class="bg-zinc-950 border border-zinc-800 rounded-xl p-5 font-mono text-xs overflow-x-auto">
+                    <div class="min-w-[680px] flex items-center justify-between gap-2">
+                        <!-- Encoder Box -->
+                        <div class="flex-1 p-4 rounded-xl bg-zinc-900/90 border border-zinc-700 space-y-2">
+                            <div class="text-sky-400 font-bold uppercase tracking-wider text-[11px]">Encoder RNN (English)</div>
+                            <div class="flex items-center justify-between gap-1 text-center">
+                                <div class="p-2 bg-zinc-950 rounded border border-zinc-800 flex-1">
+                                    h₁<br><span class="text-[10px] text-zinc-500">"banks"</span>
+                                </div>
+                                <span>→</span>
+                                <div class="p-2 bg-zinc-950 rounded border border-zinc-800 flex-1">
+                                    h₂<br><span class="text-[10px] text-zinc-500">"are"</span>
+                                </div>
+                                <span>→</span>
+                                <div class="p-2 bg-emerald-500/20 rounded border border-emerald-500/50 text-emerald-300 flex-1 font-bold">
+                                    h₃<br><span class="text-[10px]">"closed"</span>
+                                </div>
+                            </div>
+                            <div class="text-[11px] text-zinc-400 text-center pt-1">
+                                h₁, h₂ discarded in Vanilla Seq2Seq!
+                            </div>
+                        </div>
+
+                        <!-- Bottleneck Bridge -->
+                        <div class="px-3 py-4 rounded-xl bg-rose-950/40 border-2 border-dashed border-rose-500/60 text-center shrink-0">
+                            <div class="text-rose-400 font-bold text-[11px] uppercase">choke point!</div>
+                            <div class="text-white font-bold my-1">s₀ = h₃</div>
+                            <div class="live-shape text-rose-300" data-sym="(B, H)"></div>
+                            <div class="text-[10px] text-zinc-400 mt-1">1 fixed vector holds<br>entire sentence!</div>
+                        </div>
+
+                        <!-- Decoder Box -->
+                        <div class="flex-1 p-4 rounded-xl bg-zinc-900/90 border border-zinc-700 space-y-2">
+                            <div class="text-indigo-400 font-bold uppercase tracking-wider text-[11px]">Decoder RNN (Hindi)</div>
+                            <div class="flex items-center justify-between gap-1 text-center">
+                                <div class="p-2 bg-zinc-950 rounded border border-zinc-800 flex-1">
+                                    s₁ → "बैंक"<br><span class="text-[10px] text-zinc-500">in: &lt;sos&gt;</span>
+                                </div>
+                                <span>→</span>
+                                <div class="p-2 bg-zinc-950 rounded border border-zinc-800 flex-1">
+                                    s₂ → "बंद"<br><span class="text-[10px] text-zinc-500">in: "बैंक"</span>
+                                </div>
+                                <span>→</span>
+                                <div class="p-2 bg-zinc-950 rounded border border-zinc-800 flex-1">
+                                    s₃ → "हैं"<br><span class="text-[10px] text-zinc-500">in: "बंद"</span>
+                                </div>
+                            </div>
+                            <div class="text-[11px] text-zinc-400 text-center pt-1">
+                                By step 50, early words in $h_1$ are forgotten!
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ========================================== -->
+        <!-- MODULE 3: ATTENTION & (B, 1, H) TRICK      -->
+        <!-- ========================================== -->
+        <section id="module-3" class="module-section hidden space-y-6">
+            <div class="bg-gradient-to-r from-sky-950/40 via-zinc-900 to-zinc-900 border border-sky-500/30 rounded-2xl p-6">
+                <span class="text-xs font-mono uppercase text-sky-400 tracking-wider">Module 03 • Dynamic Context & Batched 3D MatMul</span>
+                <h2 class="text-2xl font-bold text-white mt-1">Attention Mechanics & The $(B, 1, H)$ Reshape Trick</h2>
+                <p class="text-sm text-zinc-300 mt-1">
+                    First `[Dec k]` runs like a normal RNN and produces its own $s_k \in (B, H)$. Then it turns that $s_k$ with `unsqueeze(1)` into **$(B, 1, H)$** so it can do a 3D Batched MatMul (`torch.bmm`) with the 3D tensor $H_{enc} \in (B, T_{in}, H)$ kept on the table!
+                </p>
+            </div>
+
+            <!-- Why (B, 1, H)? Visual Breakdown -->
+            <div class="bg-zinc-900 border border-zinc-800 rounded-2xl p-5">
+                <h3 class="text-base font-bold text-white mb-3 flex items-center gap-2">
+                    <span class="px-2 py-0.5 text-xs bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 rounded font-mono">Q&A</span>
+                    "Where did $(B, 1, H)$ come from when the input was $(B, T_{in}, H)$?"
+                </h3>
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-3 font-mono text-xs">
+                    <div class="p-3.5 rounded-xl bg-zinc-950 border border-zinc-800">
+                        <div class="text-zinc-400 mb-1">1. Normal RNN Step</div>
+                        <div class="text-emerald-300 font-bold mb-1">s₁ = tanh(y₁W_xh + s₀W_hh)</div>
+                        <div>Output is 2D: <span class="shape-pill text-emerald-300 live-shape" data-sym="(B, H)"></span></div>
+                    </div>
+                    <div class="p-3.5 rounded-xl bg-indigo-950/30 border border-indigo-500/40">
+                        <div class="text-indigo-300 mb-1">2. The unsqueeze(1) Trick</div>
+                        <div class="text-white font-bold mb-1">s₁_3d = s₁.unsqueeze(1)</div>
+                        <div>Becomes 3D: <span class="shape-pill text-indigo-300 live-shape" data-sym="(B, 1, H)"></span></div>
+                        <div class="text-[10px] text-zinc-400 mt-1">Because this is 1 decoder step!</div>
+                    </div>
+                    <div class="p-3.5 rounded-xl bg-zinc-950 border border-zinc-800">
+                        <div class="text-sky-300 mb-1">3. Score MatMul (bmm)</div>
+                        <div class="text-white font-bold mb-1">α₁ = softmax(s₁_3d @ H_encᵀ)</div>
+                        <div><span class="live-shape text-indigo-300" data-sym="(B, 1, H)"></span> × <span class="live-shape text-sky-300" data-sym="(B, H, T_in)"></span> → <span class="shape-pill text-amber-300 live-shape" data-sym="(B, 1, T_in)"></span></div>
+                    </div>
+                    <div class="p-3.5 rounded-xl bg-zinc-950 border border-zinc-800">
+                        <div class="text-emerald-300 mb-1">4. Context Weighted Sum</div>
+                        <div class="text-white font-bold mb-1">c₁ = (α₁ @ H_enc).squeeze(1)</div>
+                        <div><span class="live-shape text-amber-300" data-sym="(B, 1, T_in)"></span> × <span class="live-shape text-sky-300" data-sym="(B, T_in, H)"></span> → <span class="shape-pill text-emerald-300 live-shape" data-sym="(B, H)"></span></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Interactive 3-Step Decoder + Attention Diagram ("banks are closed" -> "बैंक बंद हैं") -->
+            <div class="bg-zinc-900 border border-zinc-800 rounded-2xl p-5 space-y-5">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div>
+                        <h3 class="text-lg font-bold text-white">Full Unrolled Decoder + Attention Diagram ($k = 1, 2, 3$)</h3>
+                        <p class="text-xs text-zinc-400">English: <strong>"banks are closed"</strong> $\longrightarrow$ Hindi (S-O-V order): <strong>"बैंक बंद हैं"</strong>. Click any Decoder step below to trace how alignment shifts!</p>
+                    </div>
+                    <div class="flex gap-2">
+                        <button onclick="selectDecStep(1)" id="dec-btn-1" class="dec-step-btn px-3 py-1.5 rounded-lg text-xs font-mono font-bold bg-indigo-600 text-white">Step k=1 ("बैंक")</button>
+                        <button onclick="selectDecStep(2)" id="dec-btn-2" class="dec-step-btn px-3 py-1.5 rounded-lg text-xs font-mono font-bold bg-zinc-800 text-zinc-300 hover:bg-zinc-700">Step k=2 ("बंद")</button>
+                        <button onclick="selectDecStep(3)" id="dec-btn-3" class="dec-step-btn px-3 py-1.5 rounded-lg text-xs font-mono font-bold bg-zinc-800 text-zinc-300 hover:bg-zinc-700">Step k=3 ("हैं")</button>
+                    </div>
+                </div>
+
+                <!-- Interactive Alignment & Step Walkthrough Card -->
+                <div id="dec-step-walkthrough" class="p-4 rounded-xl bg-zinc-950 border border-indigo-500/40">
+                    <!-- Populated dynamically by JS -->
+                </div>
+
+                <!-- Complete Unrolled Architecture Diagram (Horizontal RNN + Vertical Attention Branches) -->
+                <div class="bg-zinc-950 border border-zinc-800 rounded-xl p-4 font-mono text-xs overflow-x-auto">
+                    <pre class="text-zinc-300 leading-relaxed min-w-[720px]">
+                  ╔═════════════════════════════════════════════════════════════════════════╗
+                  ║   Fixed on the Table:  H_enc = [h₁("banks"), h₂("are"), h₃("closed")]   ║
+                  ║                         Shape: <span class="text-sky-400 font-bold live-shape" data-sym="(B, T_in, H)"></span>                                ║
+                  ╚═════════╤═════════════════════════════════╤═════════════════════════════╤╝
+                            │                                 │                             │
+              ┌─────────────┘                   ┌─────────────┘                             └─────┐
+              ▼                                 ▼                                                 ▼
+        <span class="text-indigo-400 font-bold">[Attention 1]</span>                     <span class="text-indigo-400 font-bold">[Attention 2]</span>                                     <span class="text-indigo-400 font-bold">[Attention 3]</span>
+       s₁<span class="live-shape text-zinc-400" data-sym="(B,1,H)"></span> @ H_encᵀ               s₂<span class="live-shape text-zinc-400" data-sym="(B,1,H)"></span> @ H_encᵀ                             s₃<span class="live-shape text-zinc-400" data-sym="(B,1,H)"></span> @ H_encᵀ
+       (Aligns w/ h₁ "banks")            (Aligns w/ h₃ "closed"!)                          (Aligns w/ h₂ "are"!)
+              │                                 │                                                 │
+              ▼                                 ▼                                                 ▼
+          <span class="text-emerald-400 font-bold">c₁</span> <span class="live-shape" data-sym="(B, H)"></span>                       <span class="text-emerald-400 font-bold">c₂</span> <span class="live-shape" data-sym="(B, H)"></span>                                     <span class="text-emerald-400 font-bold">c₃</span> <span class="live-shape" data-sym="(B, H)"></span>
+              │                                 │                                                 │
+              ▼                                 ▼                                                 ▼
+        Concat [s₁; c₁]                   Concat [s₂; c₂]                                   Concat [s₃; c₃]
+           <span class="text-amber-300 live-shape" data-sym="(B, 2H)"></span>                          <span class="text-amber-300 live-shape" data-sym="(B, 2H)"></span>                                        <span class="text-amber-300 live-shape" data-sym="(B, 2H)"></span>
+              │                                 │                                                 │
+              ▼ W_hy <span class="live-shape" data-sym="(2H, V)"></span>                  ▼ W_hy <span class="live-shape" data-sym="(2H, V)"></span>                                ▼ W_hy <span class="live-shape" data-sym="(2H, V)"></span>
+         <span class="text-rose-400 font-bold">Out 1: "बैंक"</span>                     <span class="text-rose-400 font-bold">Out 2: "बंद"</span>                                      <span class="text-rose-400 font-bold">Out 3: "हैं"</span>
+            <span class="live-shape" data-sym="(B, V)"></span>                            <span class="live-shape" data-sym="(B, V)"></span>                                          <span class="live-shape" data-sym="(B, V)"></span>
+              ▲                                 ▲                                                 ▲
+              │ (s₁ joins c₁)                   │ (s₂ joins c₂)                                   │ (s₃ joins c₃)
+              │                                 │                                                 │
+s₀ ──────► <span class="text-emerald-300 font-bold">[Dec 1]</span> ──────► s₁ <span class="live-shape" data-sym="(B,H)"></span> ──────► <span class="text-emerald-300 font-bold">[Dec 2]</span> ──────► s₂ <span class="live-shape" data-sym="(B,H)"></span> ────────────────────► <span class="text-emerald-300 font-bold">[Dec 3]</span> ──────► s₃ <span class="live-shape" data-sym="(B,H)"></span>
+<span class="live-shape" data-sym="(B,H)"></span>         ▲                                 ▲                                                 ▲
+              │                                 │                                                 │
+          y₁="&lt;sos&gt;"                        y₂="बैंक"                                         y₃="बंद"
+           <span class="live-shape" data-sym="(B, D)"></span>                          <span class="live-shape" data-sym="(B, D)"></span>                                        <span class="live-shape" data-sym="(B, D)"></span></pre>
+                </div>
+            </div>
+        </section>
+
+        <!-- ========================================== -->
+        <!-- MODULE 4: LUONG VS BAHDANAU INTUITION      -->
+        <!-- ========================================== -->
+        <section id="module-4" class="module-section hidden space-y-6">
+            <div class="bg-gradient-to-r from-fuchsia-950/40 via-zinc-900 to-zinc-900 border border-fuchsia-500/30 rounded-2xl p-6">
+                <span class="text-xs font-mono uppercase text-fuchsia-400 tracking-wider">Module 04 • First-Principles Evolution of Scoring Functions</span>
+                <h2 class="text-2xl font-bold text-white mt-1">Why Not Just Raw $s_k \cdot h_i$? Luong vs. Bahdanau (Additive MLP)</h2>
+                <p class="text-sm text-zinc-300 mt-1">
+                    We derived step by step what the problems with raw dot-product are, Two-Tower $\tanh(H_{enc}W_{nn})$ fails, and how the Bahdanau **6 matrices** work.
+                </p>
+            </div>
+
+            <!-- 3-Stage Intuition Progression -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
+                <!-- Flaw 1: Raw Dot Product -->
+                <div class="bg-zinc-900 border border-zinc-800 rounded-2xl p-5 flex flex-col justify-between">
+                    <div>
+                        <span class="px-2 py-0.5 text-xs font-mono bg-rose-500/20 text-rose-300 border border-rose-500/30 rounded">Issue #1: Raw $s_k \cdot h_i$</span>
+                        <h3 class="text-base font-bold text-white mt-2">Dual-Responsibility & Dimension Conflict</h3>
+                        <ul class="mt-3 space-y-2 text-xs text-zinc-300 list-disc pl-4 leading-relaxed">
+                            <li><strong>Dimension Mismatch:</strong> If $H_{enc} = 256$ and $H_{dec} = 512$, then a direct dot product is impossible!</li>
+                            <li><strong>Memory Pollution:</strong> $s_k$ must remember Hindi grammar and $h_i$ must hold English context. If we force $s_k \approx h_i$ holds, the RNN own memory gets corrupted!</li>
+                        </ul>
+                    </div>
+                    <div class="mt-4 p-3 rounded-xl bg-zinc-950 border border-zinc-800 text-xs text-emerald-300 font-mono">
+                        ✅ Fix: Separate "Search ID Card" (Query/Key projections $W_s, W_h$) from "Raw Hidden Memory"!
+                    </div>
+                </div>
+
+                <!-- Flaw 2: Why Two-Tower tanh(H_enc W_nn) is limited -->
+                <div class="bg-zinc-900 border border-zinc-800 rounded-2xl p-5 flex flex-col justify-between">
+                    <div>
+                        <span class="px-2 py-0.5 text-xs font-mono bg-amber-500/20 text-amber-300 border border-amber-500/30 rounded">Issue #2: $h_{nn} = \tanh(H_{enc}W_{nn})$</span>
+                        <h3 class="text-base font-bold text-white mt-2">Why Both $s_k$ & $H_{enc}$ Must Enter $\tanh(\dots)$</h3>
+                        <ul class="mt-3 space-y-2 text-xs text-zinc-300 list-disc pl-4 leading-relaxed">
+                            <li><strong>Point 1 (Blind/Static):</strong> $\tanh(H_{enc}W_{nn})$ contains no $s_k$ at all! It cannot adapt "Bank" (money vs river) to the Decoder's current need ($s_k$).</li>
+                            <li><strong>Point 2 (Kundali / XOR Problem):</strong> The outer dot product ($s_k \cdot h_{nn}$) can only do "Same-to-Same" linear matching. Cross-feature rule (<em>"One calm + other aggressive = Match"</em>) is learned only when <strong>both meet inside the same $\tanh$</strong>!</li>
+                        </ul>
+                    </div>
+                    <div class="mt-4 p-3 rounded-xl bg-zinc-950 border border-zinc-800 text-xs text-amber-300 font-mono">
+                        ✅ Fix: $\tanh(s_{k-1}W_s + H_{enc}W_h) \cdot v$ (Bahdanau Additive MLP!)
+                    </div>
+                </div>
+
+                <!-- Stage 3: Modern Resolution -->
+                <div class="bg-zinc-900 border border-zinc-800 rounded-2xl p-5 flex flex-col justify-between">
+                    <div>
+                        <span class="px-2 py-0.5 text-xs font-mono bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 rounded">Modern Era: Luong & Transformers</span>
+                        <h3 class="text-base font-bold text-white mt-2">Projected Dot-Product ($Q K^T$) Wins on GPUs</h3>
+                        <p class="mt-3 text-xs text-zinc-300 leading-relaxed">
+                            Luong (2015) and Transformers (2017) said: keep the Bahdanau $W_s$ and $W_h$ projections (as $W_Q, W_K$), but remove $\tanh$ and vector $v$ and use a direct <strong>Dot Product</strong>:
+                        </p>
+                        <div class="my-2 p-2 bg-zinc-950 rounded border border-zinc-800 text-center text-xs">
+                            $$\text{Score} = (s_k W_Q) \cdot (H_{enc} W_K)^T$$
+                        </div>
+                    </div>
+                    <div class="mt-4 p-3 rounded-xl bg-zinc-950 border border-zinc-800 text-xs text-indigo-300 font-mono">
+                        🚀 Matrix multiplication (`bmm`) is 10x faster on Tensor Cores than 3D broadcasting + $\tanh$!
+                    </div>
+                </div>
+            </div>
+
+            <!-- Bahdanau Broadcasting Step-by-Step Shape Trace & The 6 Weight Matrices -->
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                <!-- Left 7 Cols: Bahdanau 5-Step Shape & Broadcasting Trace -->
+                <div class="lg:col-span-7 bg-zinc-900 border border-zinc-800 rounded-2xl p-5 space-y-4">
+                    <h3 class="text-base font-bold text-white">Bahdanau Additive Attention: Exact Broadcasting Trace</h3>
+                    <p class="text-xs text-zinc-400">Notice how Bahdanau computes attention <strong>before</strong> running `[Dec k]`, using previous state $s_{k-1}$:</p>
+
+                    <div class="space-y-3 font-mono text-xs">
+                        <div class="p-3 rounded-xl bg-zinc-950 border border-zinc-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                            <div>
+                                <span class="text-fuchsia-400 font-bold">Step 1a (Decoder Query):</span> $Q = (s_{k-1} \cdot W_s).\text{unsqueeze}(1)$
+                            </div>
+                            <div>
+                                <span class="live-shape text-emerald-300" data-sym="(B, H)"></span> × <span class="live-shape text-fuchsia-300" data-sym="(H, A)"></span> → <span class="shape-pill text-fuchsia-300 live-shape" data-sym="(B, 1, A)"></span>
+                            </div>
+                        </div>
+
+                        <div class="p-3 rounded-xl bg-zinc-950 border border-zinc-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                            <div>
+                                <span class="text-sky-400 font-bold">Step 1b (Encoder Keys):</span> $K = H_{enc} \cdot W_h$
+                            </div>
+                            <div>
+                                <span class="live-shape text-sky-300" data-sym="(B, T_in, H)"></span> × <span class="live-shape text-fuchsia-300" data-sym="(H, A)"></span> → <span class="shape-pill text-sky-300 live-shape" data-sym="(B, T_in, A)"></span>
+                            </div>
+                        </div>
+
+                        <div class="p-3 rounded-xl bg-fuchsia-950/25 border border-fuchsia-500/40 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                            <div>
+                                <span class="text-amber-300 font-bold">Step 2 (Broadcast Add + Tanh):</span> $E = \tanh(Q + K)$
+                                <div class="text-[10px] text-zinc-400 mt-0.5">PyTorch copies $(B, 1, A)$ across all $T_{in}$ tokens automatically!</div>
+                            </div>
+                            <div>
+                                <span class="live-shape text-fuchsia-300" data-sym="(B, 1, A)"></span> + <span class="live-shape text-sky-300" data-sym="(B, T_in, A)"></span> → <span class="shape-pill text-amber-300 live-shape" data-sym="(B, T_in, A)"></span>
+                            </div>
+                        </div>
+
+                        <div class="p-3 rounded-xl bg-zinc-950 border border-zinc-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                            <div>
+                                <span class="text-rose-400 font-bold">Step 3 (Project to 1 Scalar Score via $v$):</span> $\text{Scores} = E \cdot v$
+                            </div>
+                            <div>
+                                <span class="live-shape text-amber-300" data-sym="(B, T_in, A)"></span> × <span class="live-shape text-rose-300" data-sym="(A, 1)"></span> → <span class="shape-pill text-rose-300 live-shape" data-sym="(B, T_in, 1)"></span>
+                            </div>
+                        </div>
+
+                        <div class="p-3 rounded-xl bg-zinc-950 border border-zinc-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                            <div>
+                                <span class="text-emerald-400 font-bold">Step 4 & 5 (Softmax & Weighted Sum):</span> $c_k = \alpha_k^T \cdot H_{enc}$
+                            </div>
+                            <div>
+                                <span class="live-shape text-rose-300" data-sym="(B, 1, T_in)"></span> × <span class="live-shape text-sky-300" data-sym="(B, T_in, H)"></span> → <span class="shape-pill text-emerald-300 live-shape" data-sym="(B, H)"></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right 5 Cols: The 6 Learnable Weight Matrices in Bahdanau Decoder -->
+                <div class="lg:col-span-5 bg-zinc-900 border border-zinc-800 rounded-2xl p-5 flex flex-col justify-between">
+                    <div>
+                        <h3 class="text-base font-bold text-white mb-1">Total 6 Weight Matrices in Bahdanau Decoder</h3>
+                        <p class="text-xs text-zinc-400 mb-4">3 weights inside the Attention module to compute scores + 3 weights of the Decoder RNN cell itself:</p>
+
+                        <div class="space-y-2 text-xs">
+                            <div class="text-[11px] font-mono uppercase text-fuchsia-400 font-bold tracking-wider">A. Attention Module Weights (3)</div>
+                            <div class="flex items-center justify-between p-2.5 rounded-lg bg-zinc-950 border border-zinc-800">
+                                <span>1. Decoder State Projection $W_s$</span>
+                                <span class="shape-pill text-fuchsia-300 live-shape" data-sym="(H, A)"></span>
+                            </div>
+                            <div class="flex items-center justify-between p-2.5 rounded-lg bg-zinc-950 border border-zinc-800">
+                                <span>2. Encoder States Projection $W_h$</span>
+                                <span class="shape-pill text-fuchsia-300 live-shape" data-sym="(H, A)"></span>
+                            </div>
+                            <div class="flex items-center justify-between p-2.5 rounded-lg bg-zinc-950 border border-zinc-800">
+                                <span>3. Alignment Score Vector $v$</span>
+                                <span class="shape-pill text-rose-300 live-shape" data-sym="(A, 1)"></span>
+                            </div>
+
+                            <div class="text-[11px] font-mono uppercase text-emerald-400 font-bold tracking-wider pt-2">B. Decoder RNN Cell Weights (3)</div>
+                            <div class="flex items-center justify-between p-2.5 rounded-lg bg-zinc-950 border border-zinc-800">
+                                <span>4. Input Weight $W_{xh}^{(dec)}$ <span class="text-zinc-500">(for $[y_k; c_k]$)</span></span>
+                                <span class="shape-pill text-amber-300 live-shape" data-sym="(D+H, H)"></span>
+                            </div>
+                            <div class="flex items-center justify-between p-2.5 rounded-lg bg-zinc-950 border border-zinc-800">
+                                <span>5. Recurrent Weight $W_{hh}^{(dec)}$</span>
+                                <span class="shape-pill text-emerald-300 live-shape" data-sym="(H, H)"></span>
+                            </div>
+                            <div class="flex items-center justify-between p-2.5 rounded-lg bg-zinc-950 border border-zinc-800">
+                                <span>6. Vocab Output Weight $W_{hy}^{(dec)}$</span>
+                                <span class="shape-pill text-rose-300 live-shape" data-sym="(H, V)"></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- One decoder step: data flow with shapes -->
+            <figure class="bg-zinc-900 border border-zinc-800 rounded-2xl p-5 text-zinc-200">
+                <h3 class="text-lg font-bold text-white mb-1">One Decoder Step: Data Flow &amp; Shapes (as in our notebook)</h3>
+                <p class="text-xs text-zinc-400 mb-3">Inputs on the left, the two concats and the output head on the right. <code class="text-amber-300">Seq2Seq.forward</code> calls this once per output position.</p>
+                <svg role="img" aria-label="One Bahdanau decoder step: s i-1 queries the attention module, which scores the precomputed keys, masks and softmaxes them into alpha i and takes a weighted sum of H_enc to get c i of shape B by 2H; the GRU cell takes the concat of E y i-1 and c i with state s i-1 and returns s i; the concat of E y i-1, s i and c i goes through fc_out to B by 2l, maxout to B by l, and W_o to logits of shape B by V. The baseline replaces the attention module with a fixed c." viewBox="0 0 930 670" style="max-width:100%;height:auto;display:block;margin:0 auto;" font-family="Inter, sans-serif">
+                    <defs>
+                        <marker id="m4-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                            <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/>
+                        </marker>
+                    </defs>
+                    <!-- containers -->
+                    <rect x="215" y="145" width="300" height="425" rx="12" fill="none" stroke="#e879f9" stroke-opacity="0.7" stroke-dasharray="6 4" stroke-width="1.3"/>
+                    <text x="365" y="164" text-anchor="middle" font-size="11.5" font-weight="600" fill="#f0abfc">Attention (use_attention=True)</text>
+                    <rect x="215" y="595" width="300" height="50" rx="8" fill="#1c1917" stroke="#fbbf24" stroke-opacity="0.8" stroke-dasharray="6 4" stroke-width="1.3"/>
+                    <!-- boxes -->
+                    <g stroke="currentColor" stroke-opacity="0.45" fill="#18181b" stroke-width="1.2">
+                        <rect x="20" y="40" width="150" height="44" rx="8"/>
+                        <rect x="20" y="183" width="150" height="44" rx="8"/>
+                        <rect x="20" y="263" width="150" height="44" rx="8"/>
+                        <rect x="20" y="423" width="150" height="44" rx="8"/>
+                        <rect x="20" y="503" width="150" height="44" rx="8"/>
+                        <rect x="230" y="40" width="170" height="44" rx="8"/>
+                        <rect x="235" y="180" width="260" height="50" rx="8"/>
+                        <rect x="235" y="260" width="260" height="50" rx="8"/>
+                        <rect x="235" y="340" width="260" height="50" rx="8"/>
+                        <rect x="235" y="420" width="260" height="50" rx="8"/>
+                        <rect x="235" y="500" width="260" height="50" rx="8"/>
+                        <rect x="570" y="37" width="200" height="50" rx="8"/>
+                        <rect x="570" y="140" width="200" height="50" rx="8" stroke="#818cf8" stroke-opacity="0.9"/>
+                        <rect x="570" y="250" width="200" height="50" rx="8"/>
+                        <rect x="570" y="345" width="200" height="50" rx="8"/>
+                        <rect x="570" y="440" width="200" height="50" rx="8"/>
+                        <rect x="570" y="535" width="200" height="50" rx="8" stroke="#fb7185" stroke-opacity="0.9"/>
+                        <rect x="790" y="140" width="125" height="50" rx="8"/>
+                        <rect x="790" y="535" width="125" height="50" rx="8"/>
+                    </g>
+                    <!-- box titles -->
+                    <g fill="currentColor" text-anchor="middle" font-size="12" font-weight="600">
+                        <text x="95" y="58">yᵢ₋₁ (token ids)</text>
+                        <text x="95" y="201">sᵢ₋₁ (decoder state)</text>
+                        <text x="95" y="281">keys = U·H_enc</text>
+                        <text x="95" y="441">mask</text>
+                        <text x="95" y="521">H_enc</text>
+                        <text x="315" y="58">E yᵢ₋₁ (embedding)</text>
+                        <text x="365" y="200">q = W sᵢ₋₁, unsqueeze(1)</text>
+                        <text x="365" y="280">tanh(q + keys)</text>
+                        <text x="365" y="360">e = V(·).squeeze(-1)</text>
+                        <text x="365" y="440">e[pad] = -inf; softmax</text>
+                        <text x="365" y="520">cᵢ = bmm(αᵢ.unsqueeze(1), H_enc)</text>
+                        <text x="365" y="615" fill="#fcd34d">Baseline: cᵢ = [h_fwd_T ; h_bwd_1]</text>
+                        <text x="670" y="57">[E yᵢ₋₁ ; cᵢ]</text>
+                        <text x="670" y="160">sᵢ = GRUCell(input, sᵢ₋₁)</text>
+                        <text x="670" y="270">[E yᵢ₋₁ ; sᵢ ; cᵢ]</text>
+                        <text x="670" y="365">t̃ = fc_out(·)</text>
+                        <text x="670" y="460">t = max over pairs</text>
+                        <text x="670" y="555">logits = W_o t</text>
+                        <text x="852" y="160">sᵢ</text>
+                        <text x="852" y="555">next yᵢ₋₁</text>
+                    </g>
+                    <!-- shapes -->
+                    <g fill="currentColor" text-anchor="middle" font-size="11" opacity="0.72" font-family="JetBrains Mono, monospace">
+                        <text x="95" y="75">(B,)</text>
+                        <text x="95" y="218">(B, H)</text>
+                        <text x="95" y="298">(B, T_in, A), once</text>
+                        <text x="95" y="458">(B, T_in) bool</text>
+                        <text x="95" y="538">(B, T_in, 2H)</text>
+                        <text x="315" y="75">(B, D)</text>
+                        <text x="365" y="219">(B, A) → (B, 1, A)</text>
+                        <text x="365" y="299">(B, T_in, A), q broadcast</text>
+                        <text x="365" y="379">(B, T_in, 1) → (B, T_in)</text>
+                        <text x="365" y="459">αᵢ (B, T_in) → heatmap row</text>
+                        <text x="365" y="539">(B, 1, 2H) → (B, 2H)</text>
+                        <text x="365" y="634">(B, 2H), same every step</text>
+                        <text x="670" y="76">(B, D + 2H)</text>
+                        <text x="670" y="179">(B, H)</text>
+                        <text x="670" y="289">(B, D + H + 2H)</text>
+                        <text x="670" y="384">(B, 2l)</text>
+                        <text x="670" y="479">view (B, l, 2) → (B, l)</text>
+                        <text x="670" y="574">(B, V)</text>
+                        <text x="852" y="179">→ next sᵢ₋₁</text>
+                        <text x="852" y="574">argmax / target</text>
+                    </g>
+                    <text x="108" y="246" text-anchor="middle" font-size="10.5" fill="currentColor" opacity="0.6" font-family="JetBrains Mono, monospace">i=1: s₀ = tanh(bridge(h_bwd_1))</text>
+                    <!-- arrows -->
+                    <g stroke="currentColor" stroke-opacity="0.7" stroke-width="1.3" fill="none">
+                        <line x1="170" y1="62" x2="228" y2="62" marker-end="url(#m4-arrow)"/>
+                        <line x1="400" y1="57" x2="568" y2="57" marker-end="url(#m4-arrow)"/>
+                        <line x1="170" y1="205" x2="233" y2="205" marker-end="url(#m4-arrow)"/>
+                        <line x1="170" y1="285" x2="233" y2="285" marker-end="url(#m4-arrow)"/>
+                        <line x1="170" y1="445" x2="233" y2="445" marker-end="url(#m4-arrow)"/>
+                        <line x1="170" y1="525" x2="233" y2="525" marker-end="url(#m4-arrow)"/>
+                        <line x1="365" y1="230" x2="365" y2="258" marker-end="url(#m4-arrow)"/>
+                        <line x1="365" y1="310" x2="365" y2="338" marker-end="url(#m4-arrow)"/>
+                        <line x1="365" y1="390" x2="365" y2="418" marker-end="url(#m4-arrow)"/>
+                        <line x1="365" y1="470" x2="365" y2="498" marker-end="url(#m4-arrow)"/>
+                        <polyline points="495,525 535,525 535,77 568,77" marker-end="url(#m4-arrow)"/>
+                        <polyline points="95,183 95,122 552,122 552,165 568,165" marker-end="url(#m4-arrow)"/>
+                        <line x1="670" y1="87" x2="670" y2="138" marker-end="url(#m4-arrow)"/>
+                        <line x1="670" y1="190" x2="670" y2="248" marker-end="url(#m4-arrow)"/>
+                        <line x1="670" y1="300" x2="670" y2="343" marker-end="url(#m4-arrow)"/>
+                        <line x1="670" y1="395" x2="670" y2="438" marker-end="url(#m4-arrow)"/>
+                        <line x1="670" y1="490" x2="670" y2="533" marker-end="url(#m4-arrow)"/>
+                        <line x1="770" y1="165" x2="788" y2="165" marker-end="url(#m4-arrow)"/>
+                        <line x1="770" y1="560" x2="788" y2="560" marker-end="url(#m4-arrow)"/>
+                    </g>
+                    <polyline points="515,620 535,620 535,527" fill="none" stroke="#fbbf24" stroke-opacity="0.8" stroke-width="1.3" stroke-dasharray="5 4"/>
+                    <!-- arrow labels -->
+                    <g fill="currentColor" font-size="11" opacity="0.8">
+                        <text x="330" y="116" text-anchor="middle">sᵢ₋₁ as GRU state</text>
+                        <text x="542" y="330">cᵢ</text>
+                        <text x="678" y="118">input</text>
+                        <text x="678" y="224">sᵢ</text>
+                    </g>
+                </svg>
+                <figcaption class="text-xs text-zinc-400 mt-3 leading-relaxed">
+                    Attention runs <strong class="text-zinc-200">before</strong> the GRU and uses the previous state sᵢ₋₁. keys are computed once per batch, outside the step loop. cᵢ feeds both concats. Training feeds the true previous token (teacher forcing); <code class="text-amber-300">predict</code> feeds back the argmax. The deep output uses the new state sᵢ, as in Eq. 4; Appendix A.2.2 writes sᵢ₋₁. The baseline (amber) swaps the whole attention box for one fixed cᵢ.
+                </figcaption>
+            </figure>
+
+            <!-- Module 3 Diagram Adapted for Bahdanau -->
+            <div class="bg-zinc-900 border border-fuchsia-500/40 rounded-2xl p-5 space-y-5">
+                <div>
+                    <span class="px-2 py-0.5 text-xs font-mono bg-fuchsia-500/20 text-fuchsia-300 border border-fuchsia-500/30 rounded">Module 3 Diagram, Adapted</span>
+                    <h3 class="text-lg font-bold text-white mt-2">Full Unrolled Bahdanau Decoder ($i = 1, 2, 3$)</h3>
+                    <p class="text-xs text-zinc-400 mt-1">Same sentence: <strong>"banks are closed"</strong> $\longrightarrow$ <strong>"बैंक बंद हैं"</strong>. The change is not only the score: attention now runs <strong>before</strong> the cell using $s_{i-1}$, and $c_i$ goes <strong>into</strong> the cell and into the output.</p>
+                </div>
+
+                <!-- The 5 differences vs Module 3 -->
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3 text-xs">
+                    <div class="p-3 rounded-xl bg-zinc-950 border border-zinc-800">
+                        <div class="font-mono text-fuchsia-400 font-bold mb-1">1. Score</div>
+                        <div class="text-zinc-400">Module 3: $s_k \cdot h_j$</div>
+                        <div class="text-zinc-200 mt-1">Bahdanau: $v_a^T \tanh(s_{i-1}W_a + h_jU_a)$</div>
+                    </div>
+                    <div class="p-3 rounded-xl bg-zinc-950 border border-zinc-800">
+                        <div class="font-mono text-amber-400 font-bold mb-1">2. Encoder</div>
+                        <div class="text-zinc-400">Module 3: one direction, $(B, T_{in}, H)$</div>
+                        <div class="text-zinc-200 mt-1">Bahdanau: Bi-RNN, $h_j = [\overrightarrow{h}_j ; \overleftarrow{h}_j]$, $(B, T_{in}, 2H)$</div>
+                    </div>
+                    <div class="p-3 rounded-xl bg-zinc-950 border border-zinc-800">
+                        <div class="font-mono text-sky-400 font-bold mb-1">3. Query</div>
+                        <div class="text-zinc-400">Module 3: $s_k$, after the cell</div>
+                        <div class="text-zinc-200 mt-1">Bahdanau: $s_{i-1}$, before the cell</div>
+                    </div>
+                    <div class="p-3 rounded-xl bg-zinc-950 border border-zinc-800">
+                        <div class="font-mono text-emerald-400 font-bold mb-1">4. Where $c_i$ goes</div>
+                        <div class="text-zinc-400">Module 3: concat with $s_k$, output only</div>
+                        <div class="text-zinc-200 mt-1">Bahdanau: into the GRU (all 3 gates) and into the output</div>
+                    </div>
+                    <div class="p-3 rounded-xl bg-zinc-950 border border-zinc-800">
+                        <div class="font-mono text-rose-400 font-bold mb-1">5. Output layer</div>
+                        <div class="text-zinc-400">Module 3: $[s_k; c_k]\,W_{hy}$</div>
+                        <div class="text-zinc-200 mt-1">Bahdanau: maxout over $(s_i, y_{i-1}, c_i)$, then $W_o$</div>
+                    </div>
+                </div>
+
+                <!-- On the table + bridge -->
+                <div class="p-4 rounded-xl bg-zinc-950 border border-zinc-800 font-mono text-xs space-y-1.5">
+                    <div><span class="text-sky-400 font-bold">On the table (Bi-RNN):</span> H_enc = [h₁ "banks", h₂ "are", h₃ "closed"] <span class="shape-pill text-sky-300 live-shape" data-sym="(B, T_in, 2H)"></span></div>
+                    <div><span class="text-fuchsia-400 font-bold">Keys, once per sentence:</span> K = H_enc · U_a <span class="live-shape text-zinc-400" data-sym="(2H, A)"></span> → <span class="shape-pill text-fuchsia-300 live-shape" data-sym="(B, T_in, A)"></span></div>
+                    <div><span class="text-emerald-400 font-bold">Bridge:</span> s₀ = tanh(h⃖₁ · W_s) <span class="live-shape text-zinc-400" data-sym="(H, H)"></span> → <span class="shape-pill text-emerald-300 live-shape" data-sym="(B, H)"></span> <span class="text-zinc-500">(h⃖₁ just read the 1st word)</span></div>
+                </div>
+
+                <!-- Unrolled steps -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 font-mono text-xs">
+                    <div class="space-y-1.5 text-center">
+                        <div class="text-indigo-300 font-bold">Step i = 1</div>
+                        <div class="p-2 rounded bg-zinc-950 border border-zinc-700">s₀ (from bridge) <span class="live-shape text-zinc-400" data-sym="(B, H)"></span></div>
+                        <div class="text-zinc-500">▼ query</div>
+                        <div class="p-2 rounded bg-fuchsia-500/10 border border-fuchsia-500/40 text-fuchsia-200">[Attention 1] with s₀<br><span class="text-zinc-400">α₁ peaks on h₁ "banks"</span></div>
+                        <div class="text-zinc-500">▼</div>
+                        <div class="p-2 rounded bg-emerald-500/10 border border-emerald-500/40 text-emerald-300">c₁ <span class="live-shape" data-sym="(B, 2H)"></span></div>
+                        <div class="text-zinc-500">▼ into the cell, with y₀ = &lt;sos&gt; and s₀</div>
+                        <div class="p-2 rounded bg-indigo-500/10 border border-indigo-500/40 text-indigo-200">[Dec 1 GRU] s₁ = GRU([E y₀ ; c₁], s₀)<br><span class="live-shape text-zinc-400" data-sym="(B, H)"></span></div>
+                        <div class="text-zinc-500">▼</div>
+                        <div class="p-2 rounded bg-rose-500/10 border border-rose-500/40 text-rose-300">Out 1 = maxout(s₁, E y₀, c₁) · W_o<br>→ "बैंक"</div>
+                        <div class="text-zinc-500">s₁ → next query, "बैंक" → next y</div>
+                    </div>
+                    <div class="space-y-1.5 text-center">
+                        <div class="text-indigo-300 font-bold">Step i = 2</div>
+                        <div class="p-2 rounded bg-zinc-950 border border-zinc-700">s₁ (from step 1) <span class="live-shape text-zinc-400" data-sym="(B, H)"></span></div>
+                        <div class="text-zinc-500">▼ query</div>
+                        <div class="p-2 rounded bg-fuchsia-500/10 border border-fuchsia-500/40 text-fuchsia-200">[Attention 2] with s₁<br><span class="text-zinc-400">α₂ peaks on h₃ "closed"</span></div>
+                        <div class="text-zinc-500">▼</div>
+                        <div class="p-2 rounded bg-emerald-500/10 border border-emerald-500/40 text-emerald-300">c₂ <span class="live-shape" data-sym="(B, 2H)"></span></div>
+                        <div class="text-zinc-500">▼ into the cell, with y₁ = "बैंक" and s₁</div>
+                        <div class="p-2 rounded bg-indigo-500/10 border border-indigo-500/40 text-indigo-200">[Dec 2 GRU] s₂ = GRU([E y₁ ; c₂], s₁)<br><span class="live-shape text-zinc-400" data-sym="(B, H)"></span></div>
+                        <div class="text-zinc-500">▼</div>
+                        <div class="p-2 rounded bg-rose-500/10 border border-rose-500/40 text-rose-300">Out 2 = maxout(s₂, E y₁, c₂) · W_o<br>→ "बंद"</div>
+                        <div class="text-zinc-500">s₂ → next query, "बंद" → next y</div>
+                    </div>
+                    <div class="space-y-1.5 text-center">
+                        <div class="text-indigo-300 font-bold">Step i = 3</div>
+                        <div class="p-2 rounded bg-zinc-950 border border-zinc-700">s₂ (from step 2) <span class="live-shape text-zinc-400" data-sym="(B, H)"></span></div>
+                        <div class="text-zinc-500">▼ query</div>
+                        <div class="p-2 rounded bg-fuchsia-500/10 border border-fuchsia-500/40 text-fuchsia-200">[Attention 3] with s₂<br><span class="text-zinc-400">α₃ peaks on h₂ "are"</span></div>
+                        <div class="text-zinc-500">▼</div>
+                        <div class="p-2 rounded bg-emerald-500/10 border border-emerald-500/40 text-emerald-300">c₃ <span class="live-shape" data-sym="(B, 2H)"></span></div>
+                        <div class="text-zinc-500">▼ into the cell, with y₂ = "बंद" and s₂</div>
+                        <div class="p-2 rounded bg-indigo-500/10 border border-indigo-500/40 text-indigo-200">[Dec 3 GRU] s₃ = GRU([E y₂ ; c₃], s₂)<br><span class="live-shape text-zinc-400" data-sym="(B, H)"></span></div>
+                        <div class="text-zinc-500">▼</div>
+                        <div class="p-2 rounded bg-rose-500/10 border border-rose-500/40 text-rose-300">Out 3 = maxout(s₃, E y₂, c₃) · W_o<br>→ "हैं"</div>
+                        <div class="text-zinc-500">next step would emit &lt;eos&gt;</div>
+                    </div>
+                </div>
+
+                <!-- One step, every shape -->
+                <div class="space-y-2 font-mono text-xs">
+                    <h4 class="text-sm font-bold text-white font-sans">One step ($i = 2$), every shape</h4>
+                    <div class="p-3 rounded-xl bg-zinc-950 border border-zinc-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <div><span class="text-fuchsia-400 font-bold">1. Query:</span> q = (s₁ · W_a).unsqueeze(1)</div>
+                        <div><span class="live-shape text-emerald-300" data-sym="(B, H)"></span> × <span class="live-shape text-fuchsia-300" data-sym="(H, A)"></span> → <span class="shape-pill text-fuchsia-300 live-shape" data-sym="(B, 1, A)"></span></div>
+                    </div>
+                    <div class="p-3 rounded-xl bg-zinc-950 border border-zinc-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <div><span class="text-amber-300 font-bold">2. Score:</span> e = (tanh(q + K) · v_a).squeeze(-1)</div>
+                        <div><span class="live-shape text-amber-300" data-sym="(B, T_in, A)"></span> × <span class="live-shape text-rose-300" data-sym="(A, 1)"></span> → <span class="shape-pill text-amber-300 live-shape" data-sym="(B, T_in)"></span></div>
+                    </div>
+                    <div class="p-3 rounded-xl bg-zinc-950 border border-zinc-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <div><span class="text-rose-400 font-bold">3. Mask + softmax:</span> e[pad] = -inf; α₂ = softmax(e, dim=1)</div>
+                        <div><span class="shape-pill text-rose-300 live-shape" data-sym="(B, T_in)"></span></div>
+                    </div>
+                    <div class="p-3 rounded-xl bg-zinc-950 border border-zinc-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <div><span class="text-emerald-400 font-bold">4. Context:</span> c₂ = (α₂.unsqueeze(1) @ H_enc).squeeze(1)</div>
+                        <div><span class="live-shape text-rose-300" data-sym="(B, 1, T_in)"></span> × <span class="live-shape text-sky-300" data-sym="(B, T_in, 2H)"></span> → <span class="shape-pill text-emerald-300 live-shape" data-sym="(B, 2H)"></span></div>
+                    </div>
+                    <div class="p-3 rounded-xl bg-indigo-950/25 border border-indigo-500/40 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <div><span class="text-indigo-300 font-bold">5. Decoder GRU:</span> s₂ = GRU(input = [E y₁ ; c₂], state = s₁)
+                            <div class="text-[10px] text-zinc-400 mt-0.5 font-sans">$c_2$ enters all three gates (update $z$, reset $r$, candidate): weights $C, C_z, C_r$, each $(2H, H)$ batch-first.</div>
+                        </div>
+                        <div><span class="live-shape text-amber-300" data-sym="(B, D+2H)"></span> + <span class="live-shape text-emerald-300" data-sym="(B, H)"></span> → <span class="shape-pill text-indigo-300 live-shape" data-sym="(B, H)"></span></div>
+                    </div>
+                    <div class="p-3 rounded-xl bg-zinc-950 border border-zinc-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <div><span class="text-rose-400 font-bold">6. Deep output:</span> t̃ = s₂·U_o + (E y₁)·V_o + c₂·C_o; t = maxout over pairs; logits = t · W_o
+                            <div class="text-[10px] text-zinc-400 mt-0.5 font-sans">$\tilde{t}$ is $(B, 2l)$, maxout keeps the larger of each pair → $(B, l)$, then $W_o$ is $(l, V)$. Paper: $l = 500$.</div>
+                        </div>
+                        <div><span class="shape-pill text-zinc-300">(B, 2l)</span> → <span class="shape-pill text-zinc-300">(B, l)</span> → <span class="shape-pill text-rose-300 live-shape" data-sym="(B, V)"></span></div>
+                    </div>
+                    <p class="text-[11px] text-zinc-500 font-sans">Note: the main text (Eq. 4) writes the output as $g(y_{i-1}, s_i, c_i)$; Appendix A.2.2 writes $U_o s_{i-1}$. This diagram follows Eq. 4.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- ========================================== -->
+        <!-- MODULE 5: BI-RNN & STATE BRIDGING          -->
+        <!-- ========================================== -->
+        <section id="module-5" class="module-section hidden space-y-6">
+            <div class="bg-gradient-to-r from-amber-950/40 via-zinc-900 to-zinc-900 border border-amber-500/30 rounded-2xl p-6">
+                <span class="text-xs font-mono uppercase text-amber-400 tracking-wider">Module 05 • Past + Future Context</span>
+                <h2 class="text-2xl font-bold text-white mt-1">Bidirectional RNN (Bi-RNN), Causality & State Bridging</h2>
+                <p class="text-sm text-zinc-300 mt-1">
+                    <em>"He went to the <strong>bank</strong> to deposit money"</em> vs. <em>"<strong>bank</strong> of the river"</em>—until the later words are seen, `"bank"` cannot capture the correct meaning. So the Encoder runs **2 independent RNNs** (Forward + Backward)!
+                </p>
+            </div>
+
+            <!-- Bi-RNN Visual Diagram & Concatenation -->
+            <div class="bg-zinc-900 border border-zinc-800 rounded-2xl p-5 space-y-4">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <h3 class="text-base font-bold text-white">Bi-RNN Encoder Architecture: Two Independent Loops $\to$ Concat</h3>
+                    <span class="shape-pill text-amber-300 live-shape" data-sym="(B, T_in, 2H)"></span>
+                </div>
+
+                <div class="bg-zinc-950 border border-zinc-800 rounded-xl p-4 font-mono text-xs overflow-x-auto">
+                    <pre class="text-zinc-300 leading-relaxed min-w-[680px]">
+<span class="text-fuchsia-400 font-bold">Backward RNN (◄── Right to Left, Independent Weights W⃖_xh, W⃖_hh):</span>
+  ◄── <span class="text-fuchsia-300 font-bold">h⃖₁</span> <span class="live-shape" data-sym="(B,H)"></span> ◄── [Bwd 1] ◄── <span class="text-fuchsia-300 font-bold">h⃖₂</span> <span class="live-shape" data-sym="(B,H)"></span> ◄── [Bwd 2] ◄── <span class="text-fuchsia-300 font-bold">h⃖₃</span> <span class="live-shape" data-sym="(B,H)"></span> ◄── [Bwd 3] ◄── h⃖₄=0
+                      ▲                        ▲                        ▲
+                      │                        │                        │
+<span class="text-emerald-400 font-bold">Forward RNN (──► Left to Right, Independent Weights W⃗_xh, W⃗_hh):</span>       │
+h⃗₀=0 ──► [Fwd 1] ──► <span class="text-emerald-300 font-bold">h⃗₁</span> <span class="live-shape" data-sym="(B,H)"></span> ──► [Fwd 2] ──► <span class="text-emerald-300 font-bold">h⃗₂</span> <span class="live-shape" data-sym="(B,H)"></span> ──► [Fwd 3] ──► <span class="text-emerald-300 font-bold">h⃗₃</span> <span class="live-shape" data-sym="(B,H)"></span>
+            ▲                        ▲                        ▲
+            │                        │                        │
+       x₁="banks"               x₂="are"                 x₃="closed"
+        <span class="live-shape text-amber-300" data-sym="(B, D)"></span>                  <span class="live-shape text-amber-300" data-sym="(B, D)"></span>                  <span class="live-shape text-amber-300" data-sym="(B, D)"></span>
+
+──────────────────────────────────────────────────────────────────────────────────────────
+<span class="text-sky-400 font-bold">Per-Word Concatenation (h_t = [h⃗_t ; h⃖_t]):</span>
+  • Word 1 ("banks"):  h₁ = [h⃗₁ ; h⃖₁] ──► <span class="text-amber-300 font-bold live-shape" data-sym="(B, 2H)"></span>   (h⃖₁ has seen "closed" → "are" → "banks"!)
+  • Word 2 ("are"):    h₂ = [h⃗₂ ; h⃖₂] ──► <span class="text-amber-300 font-bold live-shape" data-sym="(B, 2H)"></span>
+  • Word 3 ("closed"): h₃ = [h⃗₃ ; h⃖₃] ──► <span class="text-amber-300 font-bold live-shape" data-sym="(B, 2H)"></span>
+  • Stacked Table Memory H_enc:        ──► <span class="text-sky-300 font-bold live-shape" data-sym="(B, T_in, 2H)"></span>  (Changes Bahdanau W_h to <span class="text-fuchsia-300 font-bold live-shape" data-sym="(2H, A)"></span>!)</pre>
+                </div>
+            </div>
+
+            <!-- Two Critical Design Questions from Our Discussion -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- Question 1: Why Decoder Cannot Be Bidirectional -->
+                <div class="bg-zinc-900 border border-rose-500/30 rounded-2xl p-5 space-y-3">
+                    <div class="flex items-center justify-between">
+                        <span class="px-2.5 py-0.5 text-xs font-mono font-bold bg-rose-500/20 text-rose-300 border border-rose-500/30 rounded">Critical Constraint</span>
+                        <span class="text-xs font-mono text-zinc-400">Causality / Autoregressive</span>
+                    </div>
+                    <h3 class="text-lg font-bold text-white">Why Decoder Can NEVER Be Bidirectional</h3>
+                    <p class="text-xs sm:text-sm text-zinc-300 leading-relaxed">
+                        This is not just "not needed" — making the Decoder bidirectional is <strong>mathematically illegal</strong>:
+                    </p>
+                    <div class="space-y-2 text-xs text-zinc-300">
+                        <div class="p-3 rounded-xl bg-zinc-950 border border-zinc-800">
+                            <strong class="text-rose-300">1. At Inference (Testing) Time:</strong> When `[Dec 1]` is predicting the first word `"बैंक"` the future words (`"बंद"`, `"हैं"`) do not exist yet! What would a Backward RNN read right-to-left?
+                        </div>
+                        <div class="p-3 rounded-xl bg-zinc-950 border border-zinc-800">
+                            <strong class="text-amber-300">2. At Training Time (Data Leakage / Cheating):</strong> If a Backward RNN is run during training, then while predicting at Step 1 `"बैंक"` the Backward RNN would already see the target `"बैंक"` and just copy-paste without learning anything!
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Question 2: Bridging Encoder Final States to Decoder s_0 -->
+                <div class="bg-zinc-900 border border-emerald-500/30 rounded-2xl p-5 space-y-3">
+                    <div class="flex items-center justify-between">
+                        <span class="px-2.5 py-0.5 text-xs font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded">Architectural Bridge</span>
+                        <span class="shape-pill text-emerald-300 live-shape" data-sym="(2H, H)"></span>
+                    </div>
+                    <h3 class="text-lg font-bold text-white">How to Initialize Decoder $s_0 \in (B, H)$ from Bi-RNN?</h3>
+                    <p class="text-xs sm:text-sm text-zinc-300 leading-relaxed">
+                        The Encoder has two final states: the last Forward $\overrightarrow{h}_{T_{in}} \in (B, H)$ and the last Backward $\overleftarrow{h}_1 \in (B, H)$.
+                    </p>
+                    <div class="space-y-2 text-xs text-zinc-300">
+                        <div class="p-3 rounded-xl bg-zinc-950 border border-zinc-800">
+                            <strong class="text-rose-300">❌ Why Not Simple Average $\frac{1}{2}(\overrightarrow{h}_3 + \overleftarrow{h}_1)$?</strong> Both are built from different weight matrices ($\overrightarrow{h}_3$ focuses on sentence end, $\overleftarrow{h}_1$ on sentence start). Adding directly causes apples-to-oranges style destructive feature interference.
+                        </div>
+                        <div class="p-3 rounded-xl bg-zinc-950 border border-emerald-500/30">
+                            <strong class="text-emerald-300">✅ Modern Bridge Layer ($W_{bridge}$):</strong> Concatenate both and project with a learnable matrix $W_{bridge}$ <span class="live-shape text-emerald-300 font-mono" data-sym="(2H, H)"></span> :
+                            <div class="mt-1.5 text-center">
+                                $$s_0 = \tanh\Big([\overrightarrow{h}_{T_{in}} \,;\, \overleftarrow{h}_1] \cdot W_{bridge}\Big) \longrightarrow (B, H)$$
+                            </div>
+                            <span class="text-[11px] text-zinc-400">(Note: Bahdanau's 2014 paper used only $\overleftarrow{h}_1 \cdot W_{init}$ since $\overleftarrow{h}_1$ just finished reading the 1st word!)</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ========================================== -->
+        <!-- MODULE 6: VARIABLE LENGTH & DYN BATCHING   -->
+        <!-- ========================================== -->
+        <section id="module-6" class="module-section hidden space-y-6">
+            <div class="bg-gradient-to-r from-blue-950/40 via-zinc-900 to-zinc-900 border border-blue-500/30 rounded-2xl p-6">
+                <span class="text-xs font-mono uppercase text-blue-400 tracking-wider">Module 06 • Variable Length Sequences</span>
+                <h2 class="text-2xl font-bold text-white mt-1">Padding Bugs, Masking & Dynamic Batching (`pack_padded_sequence`)</h2>
+                <p class="text-sm text-zinc-300 mt-1">
+                    In real batches every sentence has a different length — to make `["banks","are","closed","&lt;pad&gt;","&lt;pad&gt;"]` into a rectangular <span class="live-shape text-amber-300 font-mono" data-sym="(B, T_in, D)"></span> we must pad with `&lt;pad&gt;`. This creates 3 silent bugs.
+                </p>
+            </div>
+
+            <!-- The 3 Padding Bugs -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
+                <div class="bg-zinc-900 border border-rose-500/30 rounded-2xl p-5 flex flex-col justify-between">
+                    <div>
+                        <span class="px-2 py-0.5 text-xs font-mono bg-rose-500/20 text-rose-300 border border-rose-500/30 rounded">Bug 1: Attention Score Leakage</span>
+                        <h3 class="text-base font-bold text-white mt-2">Why replace `&lt;pad&gt;` score with $-\infty$?</h3>
+                        <p class="mt-3 text-xs text-zinc-300 leading-relaxed">
+                            If `&lt;pad&gt;` score is kept at $0$, then Softmax gives $e^0 = 1$ and `&lt;pad&gt;` gets non-zero weight! So we insert $-\infty$ (`-1e9`) before Softmax:
+                        </p>
+                        <div class="my-2 p-2 bg-zinc-950 rounded border border-zinc-800 text-center text-xs">
+                            $$e^{-\infty} = \frac{1}{e^\infty} = \mathbf{0.0}$$
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-zinc-900 border border-amber-500/30 rounded-2xl p-5 flex flex-col justify-between">
+                    <div>
+                        <span class="px-2 py-0.5 text-xs font-mono bg-amber-500/20 text-amber-300 border border-amber-500/30 rounded">Bug 2: Forward State Pollution</span>
+                        <h3 class="text-base font-bold text-white mt-2">Sentence Ends Early ($t=3$ of $5$)</h3>
+                        <p class="mt-3 text-xs text-zinc-300 leading-relaxed">
+                            Sentence 1 (`["banks","are","closed","&lt;pad&gt;","&lt;pad&gt;"]`) has the true final state $h_3$. If the RNN runs at $t=4,5$, then $h_3 \to h_4 \to h_5$ gets polluted!
+                        </p>
+                        <div class="mt-3 p-3 rounded-xl bg-zinc-950 border border-zinc-800 text-xs text-amber-300 font-mono">
+                            ✅ Fix: $m_t = 0$ freeze $h_t = h_{t-1}$ (see Fix 1 below).
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-zinc-900 border border-purple-500/30 rounded-2xl p-5 flex flex-col justify-between">
+                    <div>
+                        <span class="px-2 py-0.5 text-xs font-mono bg-purple-500/20 text-purple-300 border border-purple-500/30 rounded">Bug 3: Backward RNN init</span>
+                        <h3 class="text-base font-bold text-white mt-2">Corrupted Reverse Start ($\overleftarrow{h}_{\text{init}} \neq 0$)</h3>
+                        <p class="mt-3 text-xs text-zinc-300 leading-relaxed">
+                            While running backward ($t=5 \to 4 \to 3$), `"closed"` ($t=3$) should have received a clean $\mathbf{0}$ from the right, but it gets garbage $\overleftarrow{h}_4$ from 2 `&lt;pad&gt;` tokens!
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Fix 1: Masking Equation -->
+            <div class="bg-zinc-900 border border-zinc-800 rounded-2xl p-5">
+                <h3 class="text-base font-bold text-white mb-1 flex items-center gap-2">
+                    <span class="px-2 py-0.5 text-xs bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded font-mono">Fix 1</span>
+                    Binary Mask Update (Without If-Else on GPU)
+                </h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
+                    <div class="p-3 bg-zinc-950 rounded-xl border border-zinc-800 text-center text-sm">
+                        $$h_t = m_t \odot h_t^{\text{new}} \;+\; (1 - m_t) \odot h_{t-1}$$
+                    </div>
+                    <div class="text-xs text-zinc-300 space-y-1.5 leading-relaxed">
+                        <p>• When the token is valid ($m_t = 1$): $h_t = h_t^{\text{new}}$ (Normal RNN update).</p>
+                        <p>• When the token is `&lt;pad&gt;` ($m_t = 0$): $h_t = h_{t-1}$ (The old state $h_3$ or backward $\mathbf{0}$ is frozen/copied as-is!).</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Fix 2: Interactive Dynamic Batching Simulator -->
+            <div class="bg-zinc-900 border border-blue-500/40 rounded-2xl p-5 space-y-4">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div>
+                        <span class="px-2 py-0.5 text-xs font-mono bg-blue-500/20 text-blue-300 border border-blue-500/30 rounded">Fix 2: PyTorch pack_padded_sequence</span>
+                        <h3 class="text-lg font-bold text-white mt-2">Interactive Simulator: $B=10$ Batch (Indices 2, 3, 5 Shorter)</h3>
+                        <p class="text-xs text-zinc-400 mt-1">Instead of slicing `(1, H)` one by one at random indexes (`2, 3, 5`), <strong>sort descending</strong> and push short sequences to the bottom rows — each step runs a contiguous top slice `h[:B_t]`!</p>
+                    </div>
+                    <div class="flex flex-wrap gap-1.5">
+                        <button onclick="setSimStep(0)" id="sim-btn-0" class="px-2.5 py-1.5 rounded-lg text-xs font-mono font-bold bg-indigo-600 text-white">0. Sort</button>
+                        <button onclick="setSimStep(1)" id="sim-btn-1" class="px-2.5 py-1.5 rounded-lg text-xs font-mono font-bold bg-zinc-800 text-zinc-300 hover:bg-zinc-700">t=1 (B₁=10)</button>
+                        <button onclick="setSimStep(2)" id="sim-btn-2" class="px-2.5 py-1.5 rounded-lg text-xs font-mono font-bold bg-zinc-800 text-zinc-300 hover:bg-zinc-700">t=2 (B₂=10)</button>
+                        <button onclick="setSimStep(3)" id="sim-btn-3" class="px-2.5 py-1.5 rounded-lg text-xs font-mono font-bold bg-zinc-800 text-zinc-300 hover:bg-zinc-700">t=3 (B₃=9)</button>
+                        <button onclick="setSimStep(4)" id="sim-btn-4" class="px-2.5 py-1.5 rounded-lg text-xs font-mono font-bold bg-zinc-800 text-zinc-300 hover:bg-zinc-700">t=4 (B₄=8)</button>
+                        <button onclick="setSimStep(5)" id="sim-btn-5" class="px-2.5 py-1.5 rounded-lg text-xs font-mono font-bold bg-zinc-800 text-zinc-300 hover:bg-zinc-700">t=5 (B₅=7)</button>
+                    </div>
+                </div>
+
+                <div id="sim-explanation" class="p-3 rounded-xl bg-blue-950/30 border border-blue-500/30 text-xs text-blue-200 font-mono"></div>
+
+                <div class="bg-zinc-950 border border-zinc-800 rounded-xl p-4 font-mono text-xs overflow-x-auto">
+                    <pre id="sim-diagram" class="text-sky-300 leading-relaxed min-w-[620px]"></pre>
+                </div>
+            </div>
+        </section>
+
+
+        <!-- ========================================== -->
+        <!-- MODULE 7: TOY EXPERIMENT, DEBUG & ANALYSIS FLOW -->
+        <!-- ========================================== -->
+        <section id="module-7" class="module-section hidden space-y-6">
+            <div class="bg-gradient-to-r from-emerald-950/40 via-zinc-900 to-zinc-900 border border-emerald-500/30 rounded-2xl p-6">
+                <span class="text-xs font-mono uppercase text-emerald-400 tracking-wider">Module 07 • Experiment Runbook</span>
+                <h2 class="text-2xl font-bold text-white mt-1">Toy Reverse Task: Debug &amp; Analysis Flow, and What It Showed</h2>
+                <p class="text-sm text-zinc-300 mt-1">
+                    Task: reverse a random token sequence (6-50 words + &lt;eos&gt;). Reversal is a hard case for a fixed context vector: the last output word is the first source word, which the encoder read up to 50 steps before the end and the decoder has to carry for up to 50 more. The flow below is the order we ran things in. Each step has a check that must pass before the next one means anything. The same flow is the plan for real data, with the substitutions in the blue "Real data" line of each card.
+                </p>
+            </div>
+
+            <!-- Flow diagram -->
+            <figure class="bg-zinc-900 border border-zinc-800 rounded-2xl p-5 text-zinc-200">
+                <svg role="img" aria-label="Experiment flow: gate run, greedy decode, full attention run, matched baseline, bucketed accuracy; loop back to training until val plateaus; then capacity sweep and the same metric on the train set; the train versus val gap separates a learning problem from memorization; read the result per length bucket." viewBox="0 0 700 990" style="max-width:100%;height:auto;display:block;margin:0 auto;" font-family="Inter, sans-serif">
+                    <defs>
+                        <marker id="m7-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                            <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/>
+                        </marker>
+                    </defs>
+                    <g stroke="currentColor" stroke-opacity="0.45" fill="#18181b" stroke-width="1.2">
+                        <rect x="150" y="20"  width="360" height="54" rx="8"/>
+                        <rect x="150" y="104" width="360" height="54" rx="8"/>
+                        <rect x="150" y="188" width="360" height="54" rx="8"/>
+                        <rect x="150" y="272" width="360" height="54" rx="8"/>
+                        <rect x="150" y="356" width="360" height="54" rx="8"/>
+                        <rect x="150" y="550" width="360" height="54" rx="8"/>
+                        <rect x="150" y="634" width="360" height="54" rx="8"/>
+                        <rect x="30"  y="820" width="240" height="54" rx="8"/>
+                        <rect x="390" y="820" width="240" height="54" rx="8"/>
+                        <rect x="150" y="916" width="360" height="54" rx="8"/>
+                    </g>
+                    <g stroke="#818cf8" stroke-width="1.5" fill="#1e1b4b">
+                        <polygon points="330,430 450,470 330,510 210,470"/>
+                        <polygon points="330,708 460,748 330,788 200,748"/>
+                    </g>
+                    <g fill="currentColor" text-anchor="middle">
+                        <text x="330" y="43"  font-size="13" font-weight="700">1. Gate run (len 10, attention)</text>
+                        <text x="330" y="62"  font-size="11.5" opacity="0.7">check: heatmap is the anti-diagonal</text>
+                        <text x="330" y="127" font-size="13" font-weight="700">2. Greedy decode</text>
+                        <text x="330" y="146" font-size="11.5" opacity="0.7">check: exact match on gate weights (2000/2000)</text>
+                        <text x="330" y="211" font-size="13" font-weight="700">3. Full run (len 6-50, attention)</text>
+                        <text x="330" y="230" font-size="11.5" opacity="0.7">check: val loss falls, resume works</text>
+                        <text x="330" y="295" font-size="13" font-weight="700">4. Matched baseline (fixed c)</text>
+                        <text x="330" y="314" font-size="11.5" opacity="0.7">check: same encoder, param count within ~2%</text>
+                        <text x="330" y="379" font-size="13" font-weight="700">5. Token accuracy by length bucket (val)</text>
+                        <text x="330" y="398" font-size="11.5" opacity="0.7">missing positions wrong, extra ignored</text>
+                        <text x="330" y="467" font-size="12.5" font-weight="700" fill="#c7d2fe">val loss</text>
+                        <text x="330" y="483" font-size="12.5" font-weight="700" fill="#c7d2fe">plateaued?</text>
+                        <text x="330" y="573" font-size="13" font-weight="700">6. Capacity sweep (H 64 → 256)</text>
+                        <text x="330" y="592" font-size="11.5" opacity="0.7">same epoch budget as the H=64 run</text>
+                        <text x="330" y="657" font-size="13" font-weight="700">7. Same bucketed metric on train set</text>
+                        <text x="330" y="676" font-size="11.5" opacity="0.7">same model, same function, train loader</text>
+                        <text x="330" y="745" font-size="12.5" font-weight="700" fill="#c7d2fe">train vs val</text>
+                        <text x="330" y="761" font-size="12.5" font-weight="700" fill="#c7d2fe">gap?</text>
+                        <text x="150" y="843" font-size="13" font-weight="700">Learning problem</text>
+                        <text x="150" y="862" font-size="11.5" opacity="0.7">low on train too: cannot fit</text>
+                        <text x="510" y="843" font-size="13" font-weight="700">Memorization</text>
+                        <text x="510" y="862" font-size="11.5" opacity="0.7">high on train, low on val</text>
+                        <text x="330" y="939" font-size="13" font-weight="700">8. Read it per bucket</text>
+                        <text x="330" y="958" font-size="11.5" opacity="0.7">both can hold, at different lengths</text>
+                    </g>
+                    <g stroke="currentColor" stroke-opacity="0.7" stroke-width="1.3" fill="none">
+                        <line x1="330" y1="74"  x2="330" y2="102" marker-end="url(#m7-arrow)"/>
+                        <line x1="330" y1="158" x2="330" y2="186" marker-end="url(#m7-arrow)"/>
+                        <line x1="330" y1="242" x2="330" y2="270" marker-end="url(#m7-arrow)"/>
+                        <line x1="330" y1="326" x2="330" y2="354" marker-end="url(#m7-arrow)"/>
+                        <line x1="330" y1="410" x2="330" y2="428" marker-end="url(#m7-arrow)"/>
+                        <line x1="330" y1="510" x2="330" y2="548" marker-end="url(#m7-arrow)"/>
+                        <polyline points="450,470 640,470 640,299 512,299" marker-end="url(#m7-arrow)"/>
+                        <line x1="330" y1="604" x2="330" y2="632" marker-end="url(#m7-arrow)"/>
+                        <line x1="330" y1="688" x2="330" y2="706" marker-end="url(#m7-arrow)"/>
+                        <polyline points="200,748 150,748 150,818" marker-end="url(#m7-arrow)"/>
+                        <polyline points="460,748 510,748 510,818" marker-end="url(#m7-arrow)"/>
+                        <polyline points="150,874 150,894 300,894 300,914" marker-end="url(#m7-arrow)"/>
+                        <polyline points="510,874 510,894 360,894 360,914" marker-end="url(#m7-arrow)"/>
+                    </g>
+                    <g fill="currentColor" font-size="11.5">
+                        <text x="345" y="532" opacity="0.8">yes</text>
+                        <text x="560" y="462" text-anchor="middle" opacity="0.8">no</text>
+                        <text x="648" y="380" opacity="0.8" transform="rotate(90 648 380)" text-anchor="middle">train more (same name resumes)</text>
+                        <text x="120" y="740" text-anchor="middle" opacity="0.8">gap ≈ 0</text>
+                        <text x="540" y="740" text-anchor="middle" opacity="0.8">train ≫ val</text>
+                    </g>
+                </svg>
+                <figcaption class="text-xs text-zinc-400 mt-3 text-center">Every step gates the next: no comparison is read until the baseline matches the attention model on everything except attention, and until the baseline's val loss has stopped falling.</figcaption>
+            </figure>
+
+            <!-- Step cards -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+
+                <div class="bg-zinc-900 border border-zinc-800 rounded-2xl p-5 space-y-2">
+                    <span class="px-2 py-0.5 text-xs font-mono bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded">Steps 1-2 • Is the model wired right?</span>
+                    <p class="text-xs text-zinc-300 leading-relaxed"><strong class="text-white">Toy:</strong> the len-10 attention model gives an anti-diagonal heatmap (output step i looks at source position T+1-i). Greedy decode on those weights: 2000/2000 exact. Decode starts from a &lt;sos&gt; built with <code class="text-amber-300">torch.full((B,), SOS)</code>, keeps a <code class="text-amber-300">finished</code> flag, writes &lt;pad&gt; after &lt;eos&gt;, and stops when all rows finish or at max_len.</p>
+                    <p class="text-xs text-zinc-300 leading-relaxed"><strong class="text-white">Side finding:</strong> the &lt;eos&gt; row of the heatmap is not sharp and varies by run (0.04 / 0.26 / 0.49). The decoder state already knows the last word was copied, so the loss never forces it to look at the source &lt;eos&gt;. Attention is sharp only where the output needs source information.</p>
+                    <p class="text-xs text-sky-300 leading-relaxed"><strong>Real data:</strong> overfit a tiny subset (about 1k pairs) to near-zero loss first. The heatmap on a known pair should be mostly monotonic, with local swaps where word order differs (adjective-noun in En-Fr).</p>
+                </div>
+
+                <div class="bg-zinc-900 border border-zinc-800 rounded-2xl p-5 space-y-2">
+                    <span class="px-2 py-0.5 text-xs font-mono bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded">Steps 3-4 • A fair baseline</span>
+                    <p class="text-xs text-zinc-300 leading-relaxed"><strong class="text-white">Toy:</strong> <code class="text-amber-300">use_attention=False</code> replaces $c_i$ with one fixed $c = [\overrightarrow{h}_T ; \overleftarrow{h}_1]$ of shape (B, 2H), computed once and fed wherever $c_i$ went (GRU input and deep output). Same Bi-GRU encoder, same decoder, so attention is the only difference. Params: 99,435 (attention) vs 97,484 (baseline); attention adds 1,951, about 2%.</p>
+                    <p class="text-xs text-zinc-300 leading-relaxed"><strong class="text-white">Bugs this caught:</strong> $s_0$ taken from hidden[0] (forward) instead of hidden[1] (backward); context set to the whole (2, B, H) hidden; the decoder calling the attention module even when it was off.</p>
+                    <p class="text-xs text-sky-300 leading-relaxed"><strong>Real data:</strong> this is RNNencdec. The paper's encoder for RNNencdec is unidirectional; ours keeps the Bi-GRU so only attention differs. State that in the write-up.</p>
+                </div>
+
+                <div class="bg-zinc-900 border border-zinc-800 rounded-2xl p-5 space-y-2">
+                    <span class="px-2 py-0.5 text-xs font-mono bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded">Step 5 • The metric</span>
+                    <p class="text-xs text-zinc-300 leading-relaxed"><strong class="text-white">Toy:</strong> greedy decode, then compare position by position against the target. Denominator is the target's non-pad tokens (words + &lt;eos&gt;). A prediction that stops early (early &lt;eos&gt;) counts the missing positions as wrong. One that runs to max_len has its extra positions ignored; that miss is already counted once, at the &lt;eos&gt; position. Buckets of 5 by source word count, plus exact match.</p>
+                    <p class="text-xs text-sky-300 leading-relaxed"><strong>Real data:</strong> token accuracy means little for translation. Use BLEU per source-length bucket, which is the paper's Fig. 2.</p>
+                </div>
+
+                <div class="bg-zinc-900 border border-amber-500/30 rounded-2xl p-5 space-y-2">
+                    <span class="px-2 py-0.5 text-xs font-mono bg-amber-500/20 text-amber-300 border border-amber-500/30 rounded">Plateau check • The confound</span>
+                    <p class="text-xs text-zinc-300 leading-relaxed"><strong class="text-white">Toy:</strong> after 10 epochs the baseline was bad everywhere, which would have "proved" the bottleneck for the wrong reason: an undertrained model is also best on short sentences. The baseline needed ~150 epochs (attention reached 1.000 in 9). Val loss is noisy in a ±0.1 band; best.pt at epoch 142 (val 1.000) was a dip below its neighbours (1.16-1.23). Quote the band, not the dip.</p>
+                    <p class="text-xs text-sky-300 leading-relaxed"><strong>Real data:</strong> train every model until no new best for ~5 evals. Long runs go in a headless script on the VM (<code class="text-amber-300">nohup python train.py</code>), because two notebook runs died when the Colab link healed and the remote Jupyter was restarted.</p>
+                </div>
+
+                <div class="bg-zinc-900 border border-zinc-800 rounded-2xl p-5 space-y-2">
+                    <span class="px-2 py-0.5 text-xs font-mono bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded">Step 6 • Is it just size?</span>
+                    <p class="text-xs text-zinc-300 leading-relaxed"><strong class="text-white">Toy:</strong> baseline at H=256 (1,150,988 params, 11.6x the attention model), 150 epochs. Mid buckets gain +0.2 to +0.28, but 36-50 gain only +0.03 to +0.08. A bigger H moves the reliable length from ~10 to ~25-30, then the curve drops sharply. A param mismatch in this direction is conservative: the bigger model is the one that loses.</p>
+                    <p class="text-xs text-zinc-300 leading-relaxed"><strong class="text-white">Why size is not the limit:</strong> 50 tokens from a ~100-word vocab is about 330 bits. A 512-float vector has far more room than that. The vector could hold the sentence; the model does not learn to put it there.</p>
+                    <p class="text-xs text-sky-300 leading-relaxed"><strong>Real data:</strong> the paper compares at equal hidden size, plus training on sentences up to 30 vs up to 50 words. Use that before a size sweep.</p>
+                </div>
+
+                <div class="bg-zinc-900 border border-zinc-800 rounded-2xl p-5 space-y-2">
+                    <span class="px-2 py-0.5 text-xs font-mono bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded">Steps 7-8 • Learning or memorizing?</span>
+                    <p class="text-xs text-zinc-300 leading-relaxed"><strong class="text-white">Toy (H=256):</strong> train minus val is ~0 at 6-10, +0.17 to +0.25 at 21-40, +0.11 at 46-50. Train/val loss gap ~2x (0.19 vs 0.37). Read per bucket: short sentences are learned; mid lengths fit the training set but do not generalize (memorization); 41-50 fail even on train (0.37-0.49), so the model cannot fit them at all. Attention is 1.000 on train and val.</p>
+                    <p class="text-xs text-sky-300 leading-relaxed"><strong>Real data:</strong> BLEU per bucket on a train subset of the same size as val.</p>
+                </div>
+            </div>
+
+            <!-- Results table -->
+            <div class="bg-zinc-900 border border-zinc-800 rounded-2xl p-5">
+                <h3 class="text-base font-bold text-white mb-1">Token accuracy by source length</h3>
+                <p class="text-xs text-zinc-400 mb-3">Greedy decode, 2000 val sentences (train column: ~20k train sentences). Attention model: H=64, best at epoch 9.</p>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-xs font-mono text-right">
+                        <thead class="text-zinc-400">
+                            <tr class="border-b border-zinc-800">
+                                <th class="text-left py-2 pr-3">len</th>
+                                <th class="py-2 px-2 text-emerald-300">attention H=64</th>
+                                <th class="py-2 px-2">base H=64 ep10</th>
+                                <th class="py-2 px-2">base H=64 ep50</th>
+                                <th class="py-2 px-2">base H=64 ep142</th>
+                                <th class="py-2 px-2">base H=256 ep145</th>
+                                <th class="py-2 px-2 text-amber-300">base H=256 train</th>
+                            </tr>
+                        </thead>
+                        <tbody class="text-zinc-200">
+                            <tr class="border-b border-zinc-800/60"><td class="text-left py-1.5 pr-3">6-10</td><td class="px-2 text-emerald-300">1.000</td><td class="px-2">0.262</td><td class="px-2">0.712</td><td class="px-2">0.954</td><td class="px-2">0.995</td><td class="px-2 text-amber-300">0.997</td></tr>
+                            <tr class="border-b border-zinc-800/60"><td class="text-left py-1.5 pr-3">11-15</td><td class="px-2 text-emerald-300">1.000</td><td class="px-2">0.170</td><td class="px-2">0.545</td><td class="px-2">0.807</td><td class="px-2">0.933</td><td class="px-2 text-amber-300">0.983</td></tr>
+                            <tr class="border-b border-zinc-800/60"><td class="text-left py-1.5 pr-3">16-20</td><td class="px-2 text-emerald-300">1.000</td><td class="px-2">0.109</td><td class="px-2">0.413</td><td class="px-2">0.646</td><td class="px-2">0.873</td><td class="px-2 text-amber-300">0.958</td></tr>
+                            <tr class="border-b border-zinc-800/60"><td class="text-left py-1.5 pr-3">21-25</td><td class="px-2 text-emerald-300">1.000</td><td class="px-2">0.089</td><td class="px-2">0.321</td><td class="px-2">0.536</td><td class="px-2">0.778</td><td class="px-2 text-amber-300">0.944</td></tr>
+                            <tr class="border-b border-zinc-800/60"><td class="text-left py-1.5 pr-3">26-30</td><td class="px-2 text-emerald-300">1.000</td><td class="px-2">0.078</td><td class="px-2">0.252</td><td class="px-2">0.462</td><td class="px-2">0.739</td><td class="px-2 text-amber-300">0.896</td></tr>
+                            <tr class="border-b border-zinc-800/60"><td class="text-left py-1.5 pr-3">31-35</td><td class="px-2 text-emerald-300">0.996</td><td class="px-2">0.062</td><td class="px-2">0.226</td><td class="px-2">0.371</td><td class="px-2">0.588</td><td class="px-2 text-amber-300">0.809</td></tr>
+                            <tr class="border-b border-zinc-800/60"><td class="text-left py-1.5 pr-3">36-40</td><td class="px-2 text-emerald-300">1.000</td><td class="px-2">0.056</td><td class="px-2">0.182</td><td class="px-2">0.321</td><td class="px-2">0.398</td><td class="px-2 text-amber-300">0.648</td></tr>
+                            <tr class="border-b border-zinc-800/60"><td class="text-left py-1.5 pr-3">41-45</td><td class="px-2 text-emerald-300">1.000</td><td class="px-2">0.052</td><td class="px-2">0.162</td><td class="px-2">0.249</td><td class="px-2">0.307</td><td class="px-2 text-amber-300">0.486</td></tr>
+                            <tr class="border-b border-zinc-800/60"><td class="text-left py-1.5 pr-3">46-50</td><td class="px-2 text-emerald-300">1.000</td><td class="px-2">0.050</td><td class="px-2">0.141</td><td class="px-2">0.224</td><td class="px-2">0.258</td><td class="px-2 text-amber-300">0.371</td></tr>
+                            <tr class="text-white font-bold"><td class="text-left py-1.5 pr-3">exact</td><td class="px-2 text-emerald-300">1.000</td><td class="px-2">0.001</td><td class="px-2">0.074</td><td class="px-2">0.195</td><td class="px-2">0.382</td><td class="px-2 text-amber-300">0.583</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p class="text-xs text-zinc-400 mt-3">Params: attention H=64 99,435 • base H=64 97,484 • base H=256 1,150,988.</p>
+            </div>
+
+            <!-- Conclusion -->
+            <div class="bg-zinc-900 border border-emerald-500/40 rounded-2xl p-5">
+                <h3 class="text-base font-bold text-white mb-2">What the toy shows</h3>
+                <div class="text-xs text-zinc-300 space-y-1.5 leading-relaxed">
+                    <p>• With a fixed context vector, accuracy falls with sentence length, and more training or 11.6x more params moves the drop to longer sentences without removing it.</p>
+                    <p>• The failure is not lack of room in the vector. Long sentences are not learned (low even on train), and mid-length ones are memorized rather than learned.</p>
+                    <p>• Attention gives the decoder a one-step path to every source position. With 1/11 of the params it gets 1.000 at every length, on train and val, in 9 epochs.</p>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- FOOTER / NEXT STEPS ROADMAP -->
+    <footer class="border-t border-zinc-800/80 bg-zinc-950 py-4 px-4 mt-8">
+        <div class="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-zinc-400">
+            <div>
+                <span class="text-zinc-200 font-semibold">Up Next in Discussion:</span> LSTMs, GRUs & Transformers.
+            </div>
+            <div class="font-mono text-[11px] text-zinc-500">
+                Interactive Single-File Reference • Ready for Netlify Drop / GitHub Pages
+            </div>
+        </div>
+    </footer>
+
+    <!-- JAVASCRIPT LOGIC -->
+    <script>
+        // State for current dimensions
+        const dims = {
+            B: 32,
+            Tin: 3,
+            Tout: 3,
+            D: 128,
+            H: 256,
+            A: 256,
+            V: 5000
+        };
+
+        // Tab Switching Logic
+        function switchTab(tabIndex) {
+            document.querySelectorAll('.module-section').forEach((sec, idx) => {
+                if (idx + 1 === tabIndex) {
+                    sec.classList.remove('hidden');
+                } else {
+                    sec.classList.add('hidden');
+                }
+            });
+
+            document.querySelectorAll('.tab-btn').forEach((btn, idx) => {
+                if (idx + 1 === tabIndex) {
+                    btn.className = "tab-btn px-3.5 py-2 rounded-lg text-xs sm:text-sm font-medium whitespace-nowrap transition-all bg-indigo-600 text-white shadow-lg shadow-indigo-600/20";
+                } else {
+                    btn.className = "tab-btn px-3.5 py-2 rounded-lg text-xs sm:text-sm font-medium whitespace-nowrap transition-all bg-zinc-900 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800";
+                }
+            });
+        }
+
+        // Format symbolic shape string into concrete numbers alongside symbolic
+        function resolveShape(sym) {
+            let concrete = sym
+                .replace(/2H/g, 2 * dims.H)
+                .replace(/D\+H/g, dims.D + dims.H)
+                .replace(/T_in/g, dims.Tin)
+                .replace(/T_out/g, dims.Tout)
+                .replace(/\bB\b/g, dims.B)
+                .replace(/\bD\b/g, dims.D)
+                .replace(/\bH\b/g, dims.H)
+                .replace(/\bA\b/g, dims.A)
+                .replace(/\bV\b/g, dims.V);
+            return `${sym} = ${concrete}`;
+        }
+
+        // Update all .live-shape elements across the DOM
+        function updateAllShapes() {
+            dims.B = parseInt(document.getElementById('dim-B').value) || 1;
+            dims.Tin = parseInt(document.getElementById('dim-Tin').value) || 1;
+            dims.Tout = parseInt(document.getElementById('dim-Tout').value) || 1;
+            dims.D = parseInt(document.getElementById('dim-D').value) || 8;
+            dims.H = parseInt(document.getElementById('dim-H').value) || 8;
+            dims.A = parseInt(document.getElementById('dim-A').value) || 8;
+            dims.V = parseInt(document.getElementById('dim-V').value) || 10;
+
+            document.querySelectorAll('.live-shape').forEach(el => {
+                const sym = el.getAttribute('data-sym');
+                if (sym) {
+                    el.textContent = resolveShape(sym);
+                }
+            });
+
+            // Refresh active interactive panels
+            selectRnnStep(currentRnnStep);
+            selectDecStep(currentDecStep);
+        }
+
+        // Module 1: Interactive RNN Step Inspector
+        let currentRnnStep = 1;
+        function selectRnnStep(step) {
+            currentRnnStep = step;
+            for (let i = 1; i <= 3; i++) {
+                const btn = document.getElementById(`rnn-step-btn-${i}`);
+                if (i === step) {
+                    btn.className = "rnn-step-btn p-3 rounded-xl border border-indigo-500 bg-indigo-500/10 text-left transition-all node-active";
+                } else {
+                    btn.className = "rnn-step-btn p-3 rounded-xl border border-zinc-800 bg-zinc-950/60 text-left transition-all hover:border-zinc-700";
+                }
+            }
+
+            const words = ["banks", "are", "closed"];
+            const detailBox = document.getElementById('rnn-step-detail');
+            const prevH = step === 1 ? `h₀ (Zero tensor of shape (${dims.B}, ${dims.H}))` : `h_${step-1} (Shape: (${dims.B}, ${dims.H}) carrying context of "${words.slice(0, step-1).join(' ')}")`;
+
+            detailBox.innerHTML = `
+                <div class="flex items-center justify-between">
+                    <span class="font-mono font-bold text-indigo-300">Tracing Time-Step t = ${step} (Token: "${words[step-1]}")</span>
+                    <span class="text-xs font-mono text-emerald-400">Weights Shared: W_xh (${dims.D}, ${dims.H}), W_hh (${dims.H}, ${dims.H})</span>
+                </div>
+                <div class="text-xs text-zinc-300 space-y-1 font-mono pt-1">
+                    <div>1. <strong>Input Projection:</strong> x_${step} (${dims.B}, ${dims.D}) @ W_xh (${dims.D}, ${dims.H}) ──► (${dims.B}, ${dims.H})</div>
+                    <div>2. <strong>Past Memory Projection:</strong> ${prevH} @ W_hh (${dims.H}, ${dims.H}) ──► (${dims.B}, ${dims.H})</div>
+                    <div>3. <strong>New State:</strong> h_${step} = tanh(proj_x + proj_h + b_h) ──► <strong>(${dims.B}, ${dims.H})</strong></div>
+                </div>
+            `;
+        }
+
+        // Module 3: Interactive Decoder + Attention Step Walkthrough
+        let currentDecStep = 1;
+        function selectDecStep(step) {
+            currentDecStep = step;
+            for (let i = 1; i <= 3; i++) {
+                const btn = document.getElementById(`dec-btn-${i}`);
+                if (i === step) {
+                    btn.className = "dec-step-btn px-3 py-1.5 rounded-lg text-xs font-mono font-bold bg-indigo-600 text-white";
+                } else {
+                    btn.className = "dec-step-btn px-3 py-1.5 rounded-lg text-xs font-mono font-bold bg-zinc-800 text-zinc-300 hover:bg-zinc-700";
+                }
+            }
+
+            const stepData = {
+                1: {
+                    inTok: "&lt;sos&gt;",
+                    outTok: "बैंक",
+                    roleQuery: "Start of sentence! I need the Subject (1st word)!",
+                    alphas: ["0.90 (h₁: 'banks')", "0.05 (h₂: 'are')", "0.05 (h₃: 'closed')"],
+                    winner: "h₁ ('banks') because h₁ encodes Word='bank' + Position=1st/Subject."
+                },
+                2: {
+                    inTok: "बैंक",
+                    outTok: "बंद",
+                    roleQuery: "Hindi S-O-V rule: Subject ('बैंक') is done, now I need the Adjective/Object ('closed'), skip 'are'!",
+                    alphas: ["0.05 (h₁: 'banks')", "0.10 (h₂: 'are')", "0.85 (h₃: 'closed')"],
+                    winner: "h₃ ('closed')! Even at Decoder step 2, Attention jumps directly to Encoder position 3!"
+                },
+                3: {
+                    inTok: "बंद",
+                    outTok: "हैं",
+                    roleQuery: "Subject and Adjective are done, now I need the Verb ('are') to finish the sentence!",
+                    alphas: ["0.04 (h₁: 'banks')", "0.88 (h₂: 'are')", "0.08 (h₃: 'closed')"],
+                    winner: "h₂ ('are')! W_hy (${2*dims.H}, ${dims.V}) projects [s₃; c₃] to Hindi verb 'हैं'."
+                }
+            };
+
+            const d = stepData[step];
+            const box = document.getElementById('dec-step-walkthrough');
+            box.innerHTML = `
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+                    <div class="p-3 rounded-lg bg-zinc-900 border border-zinc-800">
+                        <div class="font-mono text-indigo-400 font-bold mb-1">1. Decoder State s_${step} Query</div>
+                        <div class="text-zinc-300">Input token: <code class="text-amber-300">${d.inTok}</code> (${dims.B}, ${dims.D})</div>
+                        <div class="text-zinc-300 mt-1"><strong>What s_${step} asks:</strong> <em>"${d.roleQuery}"</em></div>
+                        <div class="mt-2 font-mono text-[11px] text-emerald-400">s_${step}.unsqueeze(1) ──► (${dims.B}, 1, ${dims.H})</div>
+                    </div>
+                    <div class="p-3 rounded-lg bg-zinc-900 border border-zinc-800">
+                        <div class="font-mono text-sky-400 font-bold mb-1">2. Attention Scores α_${step} (${dims.B}, 1, ${dims.Tin})</div>
+                        <div class="space-y-1 font-mono text-[11px] text-zinc-300 mt-1">
+                            <div>• α_${step},1 = ${d.alphas[0]}</div>
+                            <div>• α_${step},2 = ${d.alphas[1]}</div>
+                            <div>• α_${step},3 = ${d.alphas[2]}</div>
+                        </div>
+                    </div>
+                    <div class="p-3 rounded-lg bg-zinc-900 border border-zinc-800">
+                        <div class="font-mono text-rose-400 font-bold mb-1">3. Context c_${step} & Prediction</div>
+                        <div class="text-zinc-300"><strong>Winner:</strong> ${d.winner}</div>
+                        <div class="mt-2 font-mono text-[11px] text-amber-300">[s_${step}; c_${step}] (${dims.B}, ${2*dims.H}) @ W_hy (${2*dims.H}, ${dims.V}) ──► <strong>"${d.outTok}"</strong></div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Module 6: Dynamic Batching Simulator (B=10, indices 2,3,5 shorter)
+        const simSteps = [
+            {
+                info: "STEP 0 (SORT BY LENGTH DESC): Original shorter seqs at idx 2 (len 4), idx 3 (len 3), idx 5 (len 2) pushed to bottom rows (Rows 7,8,9). batch_sizes = [10,10,9,8,7]!",
+                ascii: "Row 0..6 (7 seqs, Len 5): [ tok1 ]  [ tok2 ]  [ tok3 ]  [ tok4 ]  [ tok5 ]\nRow 7 (old idx 2, Len 4): [ tok1 ]  [ tok2 ]  [ tok3 ]  [ tok4 ]     --\nRow 8 (old idx 3, Len 3): [ tok1 ]  [ tok2 ]  [ tok3 ]     --        --\nRow 9 (old idx 5, Len 2): [ tok1 ]  [ tok2 ]     --        --        --\n──────────────────────────────────────────────────────────────────────────\nbatch_sizes array       :   B1=10     B2=10     B3=9      B4=8      B5=7"
+            },
+            {
+                info: "TIMESTEP t=1 (B1 = 10): All 10 rows active. Single MatMul: x1 (10,D) @ W_xh + h0 (10,H) @ W_hh -> h1 (10,H).",
+                ascii: "ACTIVE SLICE: h0[:10] (10, H)  +  x1 (10, D)  ->  Outputs h1 (10, H)\nRow 0..6 : ACTIVE [ tok1 ] -> h1[0..6]\nRow 7    : ACTIVE [ tok1 ] -> h1[7]\nRow 8    : ACTIVE [ tok1 ] -> h1[8]\nRow 9    : ACTIVE [ tok1 ] -> h1[9]"
+            },
+            {
+                info: "TIMESTEP t=2 (B2 = 10): All 10 rows active. Row 9 finishes here! Its h2[9] is saved as its final state.",
+                ascii: "ACTIVE SLICE: h1[:10] (10, H)  +  x2 (10, D)  ->  Outputs h2 (10, H)\nRow 0..6 : ACTIVE [ tok2 ] -> h2[0..6]\nRow 7    : ACTIVE [ tok2 ] -> h2[7]\nRow 8    : ACTIVE [ tok2 ] -> h2[8]\nRow 9    : DONE [ tok2 ] -> h2[9] (SAVED as final for old idx 5)"
+            },
+            {
+                info: "TIMESTEP t=3 (B3 = 9): Contiguous slice h2[:9] (9,H) taken! Row 9 dropped, no loop needed. Row 8 finishes!",
+                ascii: "ACTIVE SLICE: h2[:9] (9, H)   +  x3 (9, D)   ->  Outputs h3 (9, H)\nRow 0..6 : ACTIVE [ tok3 ] -> h3[0..6]\nRow 7    : ACTIVE [ tok3 ] -> h3[7]\nRow 8    : DONE [ tok3 ] -> h3[8] (SAVED as final for old idx 3)\nRow 9    : DROPPED (No compute wasted!)"
+            },
+            {
+                info: "TIMESTEP t=4 (B4 = 8): Contiguous slice h3[:8] (8,H) taken! Row 7 finishes here!",
+                ascii: "ACTIVE SLICE: h3[:8] (8, H)   +  x4 (8, D)   ->  Outputs h4 (8, H)\nRow 0..6 : ACTIVE [ tok4 ] -> h4[0..6]\nRow 7    : DONE [ tok4 ] -> h4[7] (SAVED as final for old idx 2)\nRow 8..9 : DROPPED"
+            },
+            {
+                info: "TIMESTEP t=5 (B5 = 7): Contiguous slice h4[:7] (7,H) runs for 7 full seqs! Then unsort restores [0..9].",
+                ascii: "ACTIVE SLICE: h4[:7] (7, H)   +  x5 (7, D)   ->  Outputs h5 (7, H)\nRow 0..6 : DONE [ tok5 ] -> h5[0..6] (Final for 7 full seqs)\nRow 7..9 : DROPPED\n\nFINAL H_last (10,H): [ h5[0..6] (7,H) ; h4[7] (1,H) ; h3[8] (1,H) ; h2[9] (1,H) ]"
+            }
+        ];
+
+        function setSimStep(s) {
+            const exp = document.getElementById('sim-explanation');
+            const dia = document.getElementById('sim-diagram');
+            if (!exp || !dia) return;
+            exp.textContent = simSteps[s].info;
+            dia.textContent = simSteps[s].ascii;
+            for (let i = 0; i <= 5; i++) {
+                const btn = document.getElementById('sim-btn-' + i);
+                if (!btn) continue;
+                btn.className = i === s
+                    ? "px-2.5 py-1.5 rounded-lg text-xs font-mono font-bold bg-indigo-600 text-white"
+                    : "px-2.5 py-1.5 rounded-lg text-xs font-mono font-bold bg-zinc-800 text-zinc-300 hover:bg-zinc-700";
+            }
+        }
+
+        // Initialize KaTeX & Interactive Listeners on Load
+        window.onload = function () {
+            renderMathInElement(document.body, {
+                delimiters: [
+                    {left: '$$', right: '$$', display: true},
+                    {left: '$', right: '$', display: false}
+                ],
+                throwOnError: false,
+                output: 'mathml'
+            });
+
+            // Bind live dimension inputs
+            ['dim-B', 'dim-Tin', 'dim-Tout', 'dim-D', 'dim-H', 'dim-A', 'dim-V'].forEach(id => {
+                document.getElementById(id).addEventListener('input', updateAllShapes);
+            });
+
+            updateAllShapes();
+            setSimStep(0);
+        };
+    </script>
+</body>
+</html>
