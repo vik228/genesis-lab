@@ -151,6 +151,9 @@
                 <button onclick="switchTab(7)" id="tab-btn-7" class="tab-btn px-3.5 py-2 rounded-lg text-xs sm:text-sm font-medium whitespace-nowrap transition-all bg-zinc-900 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800">
                     7. Toy Experiment: Debug &amp; Analysis Flow
                 </button>
+                <button onclick="switchTab(8)" id="tab-btn-8" class="tab-btn px-3.5 py-2 rounded-lg text-xs sm:text-sm font-medium whitespace-nowrap transition-all bg-zinc-900 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800">
+                    8. Real Data: WMT14 En-Fr
+                </button>
             </nav>
         </div>
     </header>
@@ -1307,13 +1310,115 @@ h⃗₀=0 ──► [Fwd 1] ──► <span class="text-emerald-300 font-bold">h
             </div>
         </section>
 
+        <!-- ========================================== -->
+        <!-- MODULE 8: REAL DATA, WMT14 EN-FR           -->
+        <!-- ========================================== -->
+        <section id="module-8" class="module-section hidden space-y-6">
+            <div class="bg-gradient-to-r from-rose-950/40 via-zinc-900 to-zinc-900 border border-rose-500/30 rounded-2xl p-6">
+                <span class="text-xs font-mono uppercase text-rose-400 tracking-wider">Module 08 • Real Data</span>
+                <h2 class="text-2xl font-bold text-white mt-1">RNNsearch-50 on WMT14 En-Fr: BLEU, Beam Search and &lt;UNK&gt;</h2>
+                <p class="text-sm text-zinc-300 mt-1">
+                    The toy showed that attention removes the fixed-vector bottleneck. Here the same model runs at paper size on the paper's test set, newstest2014 (3,003 sentences). All numbers are one trained model and one run, with no significance test.
+                </p>
+            </div>
+
+            <!-- Setup vs paper -->
+            <div class="bg-zinc-900 border border-zinc-800 rounded-2xl p-5">
+                <h3 class="text-base font-bold text-white mb-3">Our setup vs the paper</h3>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-xs text-left">
+                        <thead class="text-zinc-400">
+                            <tr class="border-b border-zinc-800"><th class="py-2 pr-3"></th><th class="py-2 px-2">Paper (2014)</th><th class="py-2 px-2 text-emerald-300">Ours (2026)</th></tr>
+                        </thead>
+                        <tbody class="text-zinc-200">
+                            <tr class="border-b border-zinc-800/60"><td class="py-1.5 pr-3 text-zinc-400">Train data</td><td class="px-2">348M words, news-oriented data selection</td><td class="px-2">2M random pairs, ~1.65M after the &le; 50 length filter, no data selection</td></tr>
+                            <tr class="border-b border-zinc-800/60"><td class="py-1.5 pr-3 text-zinc-400">Model</td><td class="px-2">emb 620, H 1000, A 1000, maxout 500, 30k vocab per side</td><td class="px-2">same sizes, 80.45M params</td></tr>
+                            <tr class="border-b border-zinc-800/60"><td class="py-1.5 pr-3 text-zinc-400">Training</td><td class="px-2">~5 days</td><td class="px-2">7 epochs, ~25 h on a T4 (0.615 s/step, batch 80)</td></tr>
+                            <tr class="border-b border-zinc-800/60"><td class="py-1.5 pr-3 text-zinc-400">Tokenizer</td><td class="px-2">Moses</td><td class="px-2">sacremoses, cased, escape off</td></tr>
+                            <tr><td class="py-1.5 pr-3 text-zinc-400">BLEU</td><td class="px-2">script not named</td><td class="px-2">tokenized BLEU: sacreBLEU <code class="text-amber-300">tokenize="none"</code> on Moses tokens, against the original test references</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- BLEU table -->
+            <div class="bg-zinc-900 border border-zinc-800 rounded-2xl p-5">
+                <h3 class="text-base font-bold text-white mb-1">BLEU on newstest2014 (All column)</h3>
+                <p class="text-xs text-zinc-400 mb-3">n-gram precisions are 1/2/3/4-gram. Brevity penalty is 1.0 in every row, because every output is slightly longer than the reference.</p>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-xs font-mono text-right">
+                        <thead class="text-zinc-400">
+                            <tr class="border-b border-zinc-800"><th class="text-left py-2 pr-3">decode</th><th class="py-2 px-2 text-emerald-300">BLEU</th><th class="py-2 px-2">1-gram</th><th class="py-2 px-2">2-gram</th><th class="py-2 px-2">3-gram</th><th class="py-2 px-2">4-gram</th><th class="py-2 px-2">length ratio</th></tr>
+                        </thead>
+                        <tbody class="text-zinc-200">
+                            <tr class="border-b border-zinc-800/60"><td class="text-left py-1.5 pr-3">greedy</td><td class="px-2 text-emerald-300">15.23</td><td class="px-2">42.2</td><td class="px-2">19.4</td><td class="px-2">10.7</td><td class="px-2">6.1</td><td class="px-2">1.051</td></tr>
+                            <tr class="border-b border-zinc-800/60"><td class="text-left py-1.5 pr-3">beam 12</td><td class="px-2 text-emerald-300">18.76</td><td class="px-2">47.3</td><td class="px-2">23.8</td><td class="px-2">13.7</td><td class="px-2">8.0</td><td class="px-2">1.037</td></tr>
+                            <tr class="text-zinc-400"><td class="text-left py-1.5 pr-3">paper RNNsearch-50</td><td class="px-2">26.75</td><td class="px-2" colspan="5">beam search, 348M words</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p class="text-xs text-zinc-400 mt-3">Beam search adds +3.5 BLEU at no training cost. The rest of the gap to 26.75 is most likely data: our corpus is a random 2M-pair sample without the paper's news selection. That is a guess, not a measured cause.</p>
+            </div>
+
+            <!-- Beam search -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                <div class="bg-zinc-900 border border-zinc-800 rounded-2xl p-5 space-y-2">
+                    <span class="px-2 py-0.5 text-xs font-mono bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 rounded">Beam search • how ours works</span>
+                    <p class="text-xs text-zinc-300 leading-relaxed">Each sentence keeps K hypotheses. The B&times;K hypotheses run as one decoder batch: encoder outputs are repeated with <code class="text-amber-300">repeat_interleave(K)</code>, so row <code class="text-amber-300">b*K + k</code> is beam k of sentence b.</p>
+                    <p class="text-xs text-zinc-300 leading-relaxed">Each step: <code class="text-amber-300">scores + log_softmax</code> flattened to (B, K&middot;V), then <code class="text-amber-300">topk(K)</code>. <code class="text-amber-300">// V</code> gives the parent beam and <code class="text-amber-300">% V</code> the token; the decoder state is reordered to the parents.</p>
+                    <p class="text-xs text-zinc-300 leading-relaxed">At step 1 only beam 0 is alive (others at -inf), or topk returns K copies of one token. A finished beam can only extend with PAD at log-prob 0, so its score is frozen. The final pick is score / length.</p>
+                    <p class="text-xs text-sky-300 leading-relaxed"><strong>Tests (tiny random models):</strong> K=1 equals greedy; a K large enough to be exhaustive equals brute force; batched equals one sentence at a time.</p>
+                </div>
+                <div class="bg-zinc-900 border border-amber-500/30 rounded-2xl p-5 space-y-2">
+                    <span class="px-2 py-0.5 text-xs font-mono bg-amber-500/20 text-amber-300 border border-amber-500/30 rounded">BLEU pitfalls we hit</span>
+                    <p class="text-xs text-zinc-300 leading-relaxed"><strong class="text-white">Reference from ids:</strong> decoding the reference from its token ids turns rare words into &lt;UNK&gt;, and then a predicted &lt;UNK&gt; matches it. That inflates BLEU. Score against the original reference tokens.</p>
+                    <p class="text-xs text-zinc-300 leading-relaxed"><strong class="text-white">Second tokenizer:</strong> dropping <code class="text-amber-300">tokenize="none"</code> re-tokenizes already tokenized text and changes the score.</p>
+                    <p class="text-xs text-zinc-300 leading-relaxed"><strong class="text-white">EOS in the output:</strong> cut each prediction at its first EOS before scoring.</p>
+                </div>
+            </div>
+
+            <!-- UNK analysis -->
+            <div class="bg-zinc-900 border border-zinc-800 rounded-2xl p-5">
+                <h3 class="text-base font-bold text-white mb-1">The model over-emits &lt;UNK&gt;</h3>
+                <p class="text-xs text-zinc-400 mb-3">A run is a maximal sequence of consecutive &lt;UNK&gt;. A run of length k has k-1 adjacent pairs, so runs = UNKs - pairs. Reference UNK = reference tokens outside the 30k target vocab.</p>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-xs font-mono text-right">
+                        <thead class="text-zinc-400">
+                            <tr class="border-b border-zinc-800"><th class="text-left py-2 pr-3"></th><th class="py-2 px-2">tokens</th><th class="py-2 px-2">UNK</th><th class="py-2 px-2 text-rose-300">UNK %</th><th class="py-2 px-2">runs</th><th class="py-2 px-2 text-rose-300">avg run</th><th class="py-2 px-2">max run</th></tr>
+                        </thead>
+                        <tbody class="text-zinc-200">
+                            <tr class="border-b border-zinc-800/60"><td class="text-left py-1.5 pr-3 text-zinc-400">reference</td><td class="px-2">81,194</td><td class="px-2">4,970</td><td class="px-2 text-rose-300">6.1</td><td class="px-2">4,610</td><td class="px-2 text-rose-300">1.08</td><td class="px-2">-</td></tr>
+                            <tr class="border-b border-zinc-800/60"><td class="text-left py-1.5 pr-3">greedy</td><td class="px-2">85,327</td><td class="px-2">19,564</td><td class="px-2 text-rose-300">22.9</td><td class="px-2">7,333</td><td class="px-2 text-rose-300">2.67</td><td class="px-2">160</td></tr>
+                            <tr><td class="text-left py-1.5 pr-3">beam 12</td><td class="px-2">84,218</td><td class="px-2">13,157</td><td class="px-2 text-rose-300">15.6</td><td class="px-2">6,633</td><td class="px-2 text-rose-300">1.98</td><td class="px-2">160</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="text-xs text-zinc-300 space-y-1.5 leading-relaxed mt-3">
+                    <p>&bull; Only 6.1% of reference tokens need &lt;UNK&gt;, but the model emits it for 22.9% of its tokens under greedy decoding. It uses &lt;UNK&gt; as a safe default when unsure.</p>
+                    <p>&bull; In the reference, UNKs come alone (avg run 1.08). Greedy output has runs of ~2.7: once one &lt;UNK&gt; is emitted, the next one becomes likely. Beam search cuts both the rate and the run length, but 15.6% is still 2.6x the reference, so part of the problem is the model, not the decoder.</p>
+                    <p>&bull; Max run 160 under both decoders is most likely one sentence that never emitted EOS and hit the <code class="text-amber-300">2*max_len</code> cap. Not inspected yet.</p>
+                    <p>&bull; This is the pain point the BPE paper (2016) attacks: a fixed word vocabulary forces &lt;UNK&gt;.</p>
+                </div>
+            </div>
+
+            <!-- Open -->
+            <div class="bg-zinc-900 border border-emerald-500/40 rounded-2xl p-5">
+                <h3 class="text-base font-bold text-white mb-2">Still open</h3>
+                <div class="text-xs text-zinc-300 space-y-1.5 leading-relaxed">
+                    <p>&bull; <strong class="text-white">Fig. 2, BLEU by sentence length:</strong> RNNsearch-50 vs RNNencdec-50. This is the real-data version of the toy table in Module 07. Needs the encdec run.</p>
+                    <p>&bull; <strong class="text-white">No UNK column</strong> (paper 34.16): BLEU on sentences without unknown words only.</p>
+                    <p>&bull; Inspect the max-run-160 sentence; attention heatmaps on real sentences.</p>
+                </div>
+            </div>
+        </section>
+
     </main>
 
     <!-- FOOTER / NEXT STEPS ROADMAP -->
     <footer class="border-t border-zinc-800/80 bg-zinc-950 py-4 px-4 mt-8">
         <div class="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-zinc-400">
             <div>
-                <span class="text-zinc-200 font-semibold">Up Next in Discussion:</span> LSTMs, GRUs & Transformers.
+                <span class="text-zinc-200 font-semibold">Up Next:</span> Transformer (Vaswani et al. 2017).
             </div>
             <div class="font-mono text-[11px] text-zinc-500">
                 Interactive Single-File Reference • Ready for Netlify Drop / GitHub Pages

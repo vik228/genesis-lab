@@ -1,0 +1,366 @@
+<title>BPE 2016 - Subwords, Merges &amp; Rare Words</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap">
+<style>
+/* Layout: sticky header with tab bar, one tab panel visible at a time, cards on a zinc ground. Dark-only, matching the Genesis revision series. */
+:root {
+  color-scheme: dark;
+  --bg: #09090b;
+  --panel: #18181b;
+  --panel-2: #0f0f12;
+  --line: #27272a;
+  --fg: #e4e4e7;
+  --muted: #a1a1aa;
+  --dim: #71717a;
+  --white: #fafafa;
+  --accent: #fb923c;      /* BPE: amber-orange, "merge" */
+  --accent-soft: rgba(251, 146, 60, 0.14);
+  --ok: #6ee7b7;
+  --warn: #fcd34d;
+  --bad: #fda4af;
+  --info: #7dd3fc;
+  --code: #fcd34d;
+  --font: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--fg); font-family: var(--font); font-size: 14px; line-height: 1.55; }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg); }
+.wrap { max-width: 1100px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+header { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: rgba(9, 9, 11, 0.94); backdrop-filter: blur(8px); border-bottom: 1px solid var(--line); }
+header .wrap { padding-block: 14px 10px; display: grid; gap: 10px; }
+.eyebrow { font-family: var(--mono); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); }
+h1 { margin: 0; font-size: 20px; font-weight: 700; color: var(--white); letter-spacing: -0.01em; text-wrap: balance; }
+.sub { margin: 0; color: var(--muted); font-size: 12.5px; }
+nav[role="tablist"] { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; scrollbar-width: none; }
+nav[role="tablist"]::-webkit-scrollbar { display: none; }
+.tab { flex: none; font: 500 13px var(--font); color: var(--muted); background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 7px 12px; cursor: pointer; white-space: nowrap; }
+.tab:hover { color: var(--white); }
+.tab[aria-selected="true"] { color: #1c1008; background: var(--accent); border-color: var(--accent); font-weight: 600; }
+.tab:focus-visible { outline: 2px solid var(--info); outline-offset: 2px; }
+main .wrap { padding-block: 22px 40px; }
+section[role="tabpanel"] { display: grid; gap: 18px; }
+.lead { background: linear-gradient(90deg, var(--accent-soft), var(--panel) 60%); border: 1px solid rgba(251, 146, 60, 0.35); border-radius: 16px; padding: 20px; }
+.lead h2 { margin: 4px 0 6px; font-size: 22px; color: var(--white); text-wrap: balance; }
+.lead p { margin: 0; color: var(--fg); max-width: 75ch; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; min-width: 0; }
+.card.hl { border-color: rgba(110, 231, 183, 0.4); }
+.card.warn { border-color: rgba(252, 211, 77, 0.35); }
+.card h3 { margin: 0 0 8px; font-size: 15px; color: var(--white); }
+.card p { margin: 0 0 8px; max-width: 78ch; }
+.card p:last-child { margin-bottom: 0; }
+.card ul { margin: 0; padding-left: 18px; display: grid; gap: 6px; }
+.grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+.tag { display: inline-block; font: 600 11px var(--mono); padding: 2px 8px; border-radius: 6px; background: var(--accent-soft); color: var(--accent); border: 1px solid rgba(251, 146, 60, 0.3); margin-bottom: 8px; }
+.tag.ok { background: rgba(110, 231, 183, 0.12); color: var(--ok); border-color: rgba(110, 231, 183, 0.3); }
+.tag.warn { background: rgba(252, 211, 77, 0.12); color: var(--warn); border-color: rgba(252, 211, 77, 0.3); }
+.tag.info { background: rgba(125, 211, 252, 0.12); color: var(--info); border-color: rgba(125, 211, 252, 0.3); }
+code, .mono { font-family: var(--mono); font-size: 12.5px; }
+code { color: var(--code); }
+.muted { color: var(--muted); }
+.small { font-size: 12.5px; }
+.scroll { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 12.5px; font-variant-numeric: tabular-nums; }
+th, td { padding: 7px 10px; border-bottom: 1px solid var(--line); text-align: right; white-space: nowrap; }
+th { color: var(--muted); font-weight: 500; }
+th:first-child, td:first-child { text-align: left; }
+td.l, th.l { text-align: left; white-space: normal; }
+tr:last-child td { border-bottom: 0; }
+.num { font-family: var(--mono); }
+.good { color: var(--ok); }
+.bad { color: var(--bad); }
+.steps { display: grid; gap: 6px; font-family: var(--mono); font-size: 12.5px; }
+.step { display: grid; grid-template-columns: 30px minmax(120px, 190px) 1fr; gap: 10px; align-items: baseline; padding: 7px 10px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; }
+.step .n { color: var(--dim); }
+.step .m { color: var(--accent); }
+.step .w { color: var(--fg); overflow-wrap: anywhere; }
+@media (max-width: 560px) { .step { grid-template-columns: 24px 1fr; } .step .w { grid-column: 2; } }
+pre { margin: 0; background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; font: 12.5px/1.6 var(--mono); color: var(--fg); overflow-x: auto; }
+footer { border-top: 1px solid var(--line); }
+footer .wrap { padding-block: 14px; color: var(--dim); font-size: 12px; }
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+</style>
+
+<header>
+  <div class="wrap">
+    <div>
+      <div class="eyebrow">Stage 2.5 &middot; Sennrich, Haddow &amp; Birch, ACL 2016</div>
+      <h1>BPE: Neural Machine Translation of Rare Words with Subword Units</h1>
+      <p class="sub">Our implementation, Table 1 on WMT14 French, and BPE vs word-level RNNsearch-50 on newstest2014.</p>
+    </div>
+    <nav role="tablist" aria-label="Sections">
+      <button class="tab" role="tab" id="t-idea" aria-controls="idea">1. Pain point &amp; idea</button>
+      <button class="tab" role="tab" id="t-algo" aria-controls="algo">2. Learning &amp; applying merges</button>
+      <button class="tab" role="tab" id="t-table1" aria-controls="table1">3. Table 1: tokens, types, UNK</button>
+      <button class="tab" role="tab" id="t-run" aria-controls="run">4. The NMT run</button>
+      <button class="tab" role="tab" id="t-results" aria-controls="results">5. BLEU &amp; &lt;UNK&gt;</button>
+      <button class="tab" role="tab" id="t-open" aria-controls="open">6. Pitfalls &amp; open items</button>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <div class="wrap">
+
+    <!-- 1. IDEA -->
+    <section role="tabpanel" id="idea" aria-labelledby="t-idea">
+      <div class="lead">
+        <div class="eyebrow">Pain point</div>
+        <h2>A fixed word vocabulary turns every rare word into &lt;UNK&gt;</h2>
+        <p>NMT in 2015 used 30-50k words per side. Everything else became &lt;UNK&gt;. The baselines patched this with a back-off dictionary on the aligned source word, which breaks on compounds, names and morphology. Those words translate through units smaller than a word.</p>
+      </div>
+      <div class="grid2">
+        <div class="card">
+          <span class="tag">Why not characters?</span>
+          <p>Characters never give &lt;UNK&gt;, but sequences get much longer. On our French train data, characters need <strong class="num">4.65x</strong> the tokens of words. Every recurrent step and every attention row gets that much longer.</p>
+        </div>
+        <div class="card">
+          <span class="tag">The frequency criterion</span>
+          <p>Merge the most frequent adjacent pair, again and again. Common words end up as one symbol. Rare words stay split, because their pieces are more frequent than the whole word.</p>
+          <p class="muted small">The merge count is the knob: 0 merges = characters, all merges = words. The paper uses 59,500 (BPE-60k); we use 30,000 per side.</p>
+        </div>
+        <div class="card hl">
+          <span class="tag ok">Zero &lt;UNK&gt;</span>
+          <p>In the worst case a word falls back to characters, and characters are in the vocabulary. So the test set has no &lt;UNK&gt;, except for characters never seen in training (the paper's footnote: 32 UNK with joint BPE).</p>
+        </div>
+        <div class="card">
+          <span class="tag info">What the paper actually claims</span>
+          <p>Linguistic splitters (compound splitting, Morfessor, hyphenation) appear only in the Table 1 statistics, rejected because they still leave UNKs. The NMT comparisons (Table 2) are word-level, back-off dictionary, character bigrams and BPE. Whether linguistically meaningful splits translate better is not tested.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 2. ALGORITHM -->
+    <section role="tabpanel" id="algo" aria-labelledby="t-algo" hidden>
+      <div class="lead">
+        <div class="eyebrow">Algorithm</div>
+        <h2>Count pairs, merge the top pair, recount</h2>
+        <p>Start from characters plus an end-of-word marker <code>&lt;/w&gt;</code>, so merges never cross a word boundary. Pair counts are weighted by word frequency. The output is an ordered list of merges.</p>
+      </div>
+      <div class="card">
+        <h3>Worked example</h3>
+        <p class="small muted">Word counts: low &times;5, lower &times;2, newest &times;6, widest &times;3. Each row is one merge and the corpus after it. Ties are broken by first occurrence.</p>
+        <div class="steps">
+          <div class="step"><span class="n">1</span><span class="m">e + s &rarr; es (9)</span><span class="w">l o w &lt;/w&gt; &middot; l o w e r &lt;/w&gt; &middot; n e w es t &lt;/w&gt; &middot; w i d es t &lt;/w&gt;</span></div>
+          <div class="step"><span class="n">2</span><span class="m">es + t &rarr; est (9)</span><span class="w">n e w est &lt;/w&gt; &middot; w i d est &lt;/w&gt;</span></div>
+          <div class="step"><span class="n">3</span><span class="m">est + &lt;/w&gt; (9)</span><span class="w">n e w est&lt;/w&gt; &middot; w i d est&lt;/w&gt;</span></div>
+          <div class="step"><span class="n">4</span><span class="m">l + o &rarr; lo (7)</span><span class="w">lo w &lt;/w&gt; &middot; lo w e r &lt;/w&gt;</span></div>
+          <div class="step"><span class="n">5</span><span class="m">lo + w &rarr; low (7)</span><span class="w">low &lt;/w&gt; &middot; low e r &lt;/w&gt;</span></div>
+          <div class="step"><span class="n">6-8</span><span class="m">n+e, ne+w, new+est&lt;/w&gt; (6)</span><span class="w">newest&lt;/w&gt; is now one symbol; widest stays w i d est&lt;/w&gt;</span></div>
+        </div>
+        <p class="small" style="margin-top:10px">The frequent word <strong>newest</strong> becomes one symbol. The rarer <strong>widest</strong> stays as pieces, and its suffix <code>est&lt;/w&gt;</code> is shared with newest.</p>
+      </div>
+      <div class="grid2">
+        <div class="card">
+          <span class="tag">Applying merges to a new word</span>
+          <p>Unseen word <strong>lowest</strong>: <code>l o w e s t &lt;/w&gt;</code>. Apply merges in learned order:</p>
+          <pre>e+s     -&gt; l o w es t &lt;/w&gt;
+es+t    -&gt; l o w est &lt;/w&gt;
+est+&lt;/w&gt; -&gt; l o w est&lt;/w&gt;
+l+o     -&gt; lo w est&lt;/w&gt;
+lo+w    -&gt; low est&lt;/w&gt;</pre>
+          <p class="small" style="margin-top:8px">Result: <code>low</code> + <code>est&lt;/w&gt;</code>. Both pieces are in the vocabulary, so no &lt;UNK&gt;.</p>
+        </div>
+        <div class="card">
+          <span class="tag ok">Rank-based apply (Vikas's rewrite)</span>
+          <p>Looping over all 30k merges per word is slow. Instead: build <code>rules_map = {pair: rank}</code> once; for the word's current pairs, pick the one with the lowest rank; merge; repeat until no pair is in the map.</p>
+          <p class="small">Same output as the ordered loop, about 60x faster. Fixed two bugs on the way: a crash on a word with no pairs left, and rebuilding the map on every call.</p>
+        </div>
+        <div class="card">
+          <span class="tag">Learning fast</span>
+          <p>Recounting all pairs after every merge is O(corpus) per merge. Our <code>learn_bpe</code> keeps a pair-count heap plus an index <code>pair &rarr; words containing it</code>. A merge only touches the words that contain the pair: remove their old pairs, add their new pairs.</p>
+        </div>
+        <div class="card warn">
+          <span class="tag warn">Undo before scoring</span>
+          <p>The decoder emits subwords. <code>undo_bpe</code> joins pieces until one ends in <code>&lt;/w&gt;</code>, then strips the marker. BLEU is computed on the rejoined words, so BPE and word-level scores are comparable.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 3. TABLE 1 -->
+    <section role="tabpanel" id="table1" aria-labelledby="t-table1" hidden>
+      <div class="lead">
+        <div class="eyebrow">Paper Table 1, on our data</div>
+        <h2>BPE keeps sequences short and removes &lt;UNK&gt;</h2>
+        <p>French side of our WMT14 train set (full 2M-pair cache) against newstest2014. Paper definitions: tokens = train length, types = distinct train symbols, UNK = test tokens whose symbol never appears in train, counted per occurrence.</p>
+      </div>
+      <div class="card">
+        <div class="scroll">
+          <table>
+            <thead><tr><th>segmentation</th><th>tokens</th><th>vs words</th><th>types</th><th>test UNK</th></tr></thead>
+            <tbody>
+              <tr><td>whole words</td><td class="num">41,886,023</td><td class="num">1.00x</td><td class="num">503,258</td><td class="num bad">917</td></tr>
+              <tr><td>characters</td><td class="num">194,704,633</td><td class="num bad">4.65x</td><td class="num">1,410</td><td class="num good">0</td></tr>
+              <tr><td>BPE, 30k merges</td><td class="num">45,385,949</td><td class="num good">1.08x</td><td class="num">30,922</td><td class="num good">0</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="small muted" style="margin-top:10px">Paper (German, 59,500 merges): characters 5.5x, BPE 1.12x the word tokens. Same pattern.</p>
+      </div>
+      <div class="grid2">
+        <div class="card">
+          <span class="tag">Read it like this</span>
+          <p>Words: short sequences, a huge type count, and UNKs. Characters: no UNKs but 4.65x longer. BPE gets both good properties: almost word-length sequences (1.08x) and zero UNK, with a 30k vocabulary.</p>
+          <p class="small muted">Only 917 UNK here because this column counts words never seen in train. With a 30k word vocabulary, everything outside the top 30k is also &lt;UNK&gt;: that is 6.1% of newstest2014 target tokens.</p>
+        </div>
+        <div class="card warn">
+          <span class="tag warn">Small-corpus artifact</span>
+          <p>On a 2k-sentence Mac slice, BPE showed <em>more</em> UNK (7,748) than whole words. Not a code bug: 30k merges exhaust a ~5,200-word vocabulary after 9,018 merges, so every train word becomes one symbol, and unseen test words split into pieces never seen in train. On the full data BPE UNK is 0.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 4. RUN -->
+    <section role="tabpanel" id="run" aria-labelledby="t-run" hidden>
+      <div class="lead">
+        <div class="eyebrow">Translation experiment</div>
+        <h2>Same RNNsearch-50, only the vocabulary changes</h2>
+        <p>BPE's translation claim is tested on our own Bahdanau model, so the only difference between the two systems is the segmentation.</p>
+      </div>
+      <div class="card">
+        <div class="scroll">
+          <table>
+            <thead><tr><th class="l"></th><th class="l">word-level search50</th><th class="l">BPE search50</th></tr></thead>
+            <tbody>
+              <tr><td class="l muted">Data</td><td class="l" colspan="2">WMT14 En-Fr, 2M random pairs, newstest2013 val, newstest2014 test (3,003)</td></tr>
+              <tr><td class="l muted">Vocabulary</td><td class="l">30k words per side</td><td class="l">30k merges per side, separate En and Fr: 30,853 / 30,755 symbols</td></tr>
+              <tr><td class="l muted">Length filter</td><td class="l">&le; 50 words</td><td class="l">&le; 50 words, then &le; 80 BPE symbols (1,262 pairs dropped): 1,647,060 pairs</td></tr>
+              <tr><td class="l muted">Model</td><td class="l">emb 620, H 1000, A 1000, maxout 500; 80.45M params</td><td class="l">same; 81.8M params (bigger vocab)</td></tr>
+              <tr><td class="l muted">Speed</td><td class="l">0.615 s/step (T4)</td><td class="l">~0.85 s/step, ~4.9 h/epoch</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="grid2">
+        <div class="card warn">
+          <span class="tag warn">Do not compare val loss</span>
+          <p>BPE val loss is per BPE symbol and word-level val loss is per word. Different units, so compare the two systems by BLEU only.</p>
+        </div>
+        <div class="card">
+          <span class="tag">Merges are not in the checkpoint</span>
+          <p><code>best.pt</code> stores the vocab and config, so both models load without the train data. The English merges are not stored. We re-learn them (deterministic) to segment the test source with <code>segment(word, rules_map)</code>, which adds <code>&lt;/w&gt;</code>.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 5. RESULTS -->
+    <section role="tabpanel" id="results" aria-labelledby="t-results" hidden>
+      <div class="lead">
+        <div class="eyebrow">Paper Table 2, BLEU part</div>
+        <h2>BPE wins by ~0.9 BLEU, under greedy and beam alike</h2>
+        <p>Tokenized BLEU on newstest2014 against the original reference tokens. One trained model per system and no significance test, so read the gap as a direction.</p>
+      </div>
+      <div class="card">
+        <div class="scroll">
+          <table>
+            <thead><tr><th>system</th><th>BLEU</th><th>1-gram</th><th>2-gram</th><th>3-gram</th><th>4-gram</th><th>length ratio</th></tr></thead>
+            <tbody>
+              <tr><td>word greedy</td><td class="num">15.23</td><td class="num">42.2</td><td class="num">19.4</td><td class="num">10.7</td><td class="num">6.1</td><td class="num">1.051</td></tr>
+              <tr><td>BPE greedy</td><td class="num good">16.11</td><td class="num">45.8</td><td class="num">20.6</td><td class="num">11.2</td><td class="num">6.4</td><td class="num">1.028</td></tr>
+              <tr><td>word beam 12</td><td class="num">18.76</td><td class="num">47.3</td><td class="num">23.8</td><td class="num">13.7</td><td class="num">8.0</td><td class="num">1.037</td></tr>
+              <tr><td>BPE beam 12</td><td class="num good">19.62</td><td class="num">49.2</td><td class="num">24.9</td><td class="num">14.3</td><td class="num">8.5</td><td class="num">1.042</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="small muted" style="margin-top:10px">BPE gap: +0.88 greedy, +0.86 beam. Paper, En-De single model: word-level 20.6 &rarr; BPE-60k 21.5 (+0.9).</p>
+      </div>
+      <div class="grid2">
+        <div class="card hl">
+          <span class="tag ok">The gap is not a decoding artifact</span>
+          <p>Greedy decoding traps the word-level model in &lt;UNK&gt; loops, so part of the greedy gap could have come from that. But beam search adds ~+3.5 to both systems and the gap stays at 0.86. So the gain comes from the vocabulary.</p>
+        </div>
+        <div class="card">
+          <span class="tag">Where the gain sits</span>
+          <p>Mostly in unigram precision (+3.6 greedy, +1.9 beam); higher n-grams move less. That fits BPE: it gets more individual words right, while the architecture, and with it word order, is the same.</p>
+        </div>
+      </div>
+      <div class="card">
+        <h3>&lt;UNK&gt; in the output</h3>
+        <div class="scroll">
+          <table>
+            <thead><tr><th></th><th>UNK %</th><th>avg UNK run</th><th>max run</th></tr></thead>
+            <tbody>
+              <tr><td class="muted">reference, outside the 30k word vocab</td><td class="num">6.1</td><td class="num">1.08</td><td class="num">-</td></tr>
+              <tr><td>word greedy</td><td class="num bad">22.9</td><td class="num bad">2.67</td><td class="num">160</td></tr>
+              <tr><td>word beam 12</td><td class="num bad">15.6</td><td class="num">1.98</td><td class="num">160</td></tr>
+              <tr><td>BPE greedy / beam</td><td class="num good">0.0</td><td class="num">-</td><td class="num">-</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="small" style="margin-top:10px">The word-level model uses &lt;UNK&gt; as a safe default: 2.6x to 3.8x the rate the reference needs. BPE has no &lt;UNK&gt; symbol to fall back on, so it must spell a word out of pieces.</p>
+      </div>
+    </section>
+
+    <!-- 6. OPEN -->
+    <section role="tabpanel" id="open" aria-labelledby="t-open" hidden>
+      <div class="grid2">
+        <div class="card warn">
+          <span class="tag warn">Bugs that changed the numbers</span>
+          <ul class="small">
+            <li><strong>BPE BLEU 0.01:</strong> <code>is_bpe=False</code>, and source words segmented without <code>&lt;/w&gt;</code>. Use <code>segment(word, rules_map)</code>.</li>
+            <li><strong>Reference from ids:</strong> &lt;UNK&gt; in both hypothesis and reference matched, inflating BLEU. Score against the original tokens.</li>
+            <li><strong>Lost <code>tokenize="none"</code></strong> in a refactor: a second tokenizer changed the score.</li>
+            <li><strong>Table 1 v1:</strong> types returned as a set, UNK counted per unique word instead of per occurrence.</li>
+          </ul>
+        </div>
+        <div class="card">
+          <span class="tag info">Still open</span>
+          <ul class="small">
+            <li><strong>Unigram F1 for all / rare / OOV words</strong>, the paper's main Table 2 metric (rare = outside the top 50k, OOV = not in train). Word-level OOV F1 should be near 0 by construction.</li>
+            <li>chrF3, the paper's second metric (one sacreBLEU call).</li>
+            <li>Unigram F1 by training-frequency rank, the paper's Fig. 2.</li>
+            <li>The max-run-160 sentence.</li>
+          </ul>
+        </div>
+        <div class="card">
+          <span class="tag">Engineering notes</span>
+          <ul class="small">
+            <li><code>torch.load(..., weights_only=False)</code> for our own 1 GB cache: the default unpickler went past 10 GB RAM and was killed.</li>
+            <li><code>colab exec</code> can land in a different kernel than the notebook. Check <code>ps</code> before concluding that nothing runs.</li>
+            <li>Write notebook files atomically (temp file + rename) when an editor with autoreload has them open.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+  </div>
+</main>
+
+<footer>
+  <div class="wrap">Genesis lab &middot; notebook <code>notebooks/sennrich-2016-bpe.ipynb</code> &middot; Next: Transformer (Vaswani et al. 2017).</div>
+</footer>
+
+<script>
+(function () {
+  var tabs = Array.prototype.slice.call(document.querySelectorAll('[role="tab"]'));
+  var panels = Array.prototype.slice.call(document.querySelectorAll('[role="tabpanel"]'));
+  function show(id, focus) {
+    var found = panels.some(function (p) { return p.id === id; });
+    if (!found) id = panels[0].id;
+    panels.forEach(function (p) { p.hidden = p.id !== id; });
+    tabs.forEach(function (t) {
+      var on = t.getAttribute('aria-controls') === id;
+      t.setAttribute('aria-selected', on ? 'true' : 'false');
+      t.tabIndex = on ? 0 : -1;
+      if (on && focus) t.focus();
+      if (on) t.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    });
+  }
+  tabs.forEach(function (t, i) {
+    t.addEventListener('click', function () {
+      var id = t.getAttribute('aria-controls');
+      if (location.hash !== '#' + id) { location.hash = id; } else { show(id); }
+      window.scrollTo(0, 0);
+    });
+    t.addEventListener('keydown', function (e) {
+      var d = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0;
+      if (!d) return;
+      var next = tabs[(i + d + tabs.length) % tabs.length];
+      location.hash = next.getAttribute('aria-controls');
+      next.focus();
+    });
+  });
+  window.addEventListener('hashchange', function () { show(location.hash.slice(1)); });
+  show(location.hash.slice(1));
+})();
+</script>
