@@ -1,0 +1,1050 @@
+<title>Before the Transformer</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap">
+<style>
+/* Layout: sticky header with a tab bar of 8 groups; each panel = a short thesis, "remember" cards with our own evidence, and a "carry into 2017" question box. Dark-only, matching the Genesis revision series. */
+:root {
+  color-scheme: dark;
+  --bg: #09090b;
+  --panel: #18181b;
+  --panel-2: #0f0f12;
+  --line: #27272a;
+  --fg: #e4e4e7;
+  --muted: #a1a1aa;
+  --dim: #71717a;
+  --white: #fafafa;
+  --accent: #5eead4;
+  --accent-ink: #042f2e;
+  --accent-soft: rgba(94, 234, 212, 0.12);
+  --q: #c4b5fd;
+  --q-soft: rgba(196, 181, 253, 0.10);
+  --ok: #6ee7b7;
+  --warn: #fcd34d;
+  --bad: #fda4af;
+  --code: #fcd34d;
+  --font: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--fg); font-family: var(--font); font-size: 14px; line-height: 1.55; }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg); }
+.wrap { max-width: 1120px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+header { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: rgba(9, 9, 11, 0.94); backdrop-filter: blur(8px); border-bottom: 1px solid var(--line); }
+header .wrap { padding-block: 14px 10px; display: grid; gap: 10px; }
+.eyebrow { font-family: var(--mono); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); }
+h1 { margin: 0; font-size: 20px; font-weight: 700; color: var(--white); letter-spacing: -0.01em; text-wrap: balance; }
+.sub { margin: 0; color: var(--muted); font-size: 12.5px; max-width: 90ch; }
+nav[role="tablist"] { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; scrollbar-width: none; }
+nav[role="tablist"]::-webkit-scrollbar { display: none; }
+.tab { flex: none; font: 500 13px var(--font); color: var(--muted); background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 7px 12px; cursor: pointer; white-space: nowrap; }
+.tab:hover { color: var(--white); }
+.tab[aria-selected="true"] { color: var(--accent-ink); background: var(--accent); border-color: var(--accent); font-weight: 600; }
+.tab:focus-visible { outline: 2px solid var(--q); outline-offset: 2px; }
+main .wrap { padding-block: 22px 40px; }
+section[role="tabpanel"] { display: grid; gap: 18px; }
+.lead { background: linear-gradient(90deg, var(--accent-soft), var(--panel) 65%); border: 1px solid rgba(94, 234, 212, 0.3); border-radius: 16px; padding: 20px; }
+.lead h2 { margin: 4px 0 6px; font-size: 22px; color: var(--white); text-wrap: balance; }
+.lead p { margin: 0 0 6px; color: var(--fg); max-width: 80ch; }
+.lead p:last-child { margin-bottom: 0; }
+.cols { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+@media (max-width: 860px) { .cols { grid-template-columns: 1fr; } }
+.stack { display: grid; gap: 12px; min-width: 0; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 16px 18px; min-width: 0; }
+.card h3 { margin: 0 0 6px; font-size: 14.5px; color: var(--white); }
+.card p { margin: 0 0 6px; max-width: 78ch; }
+.card p:last-child { margin-bottom: 0; }
+.ev { margin-top: 8px; padding: 8px 10px; border-radius: 8px; background: var(--panel-2); border: 1px solid var(--line); font-size: 12.5px; color: var(--muted); }
+.ev b { color: var(--accent); font-weight: 600; font-family: var(--mono); font-size: 11px; letter-spacing: 0.05em; text-transform: uppercase; margin-right: 6px; }
+.qbox { background: var(--q-soft); border: 1px solid rgba(196, 181, 253, 0.35); border-radius: 14px; padding: 16px 18px; position: sticky; top: 140px; }
+@media (max-width: 860px) { .qbox { position: static; } }
+.qbox h3 { margin: 0 0 4px; font-size: 14.5px; color: var(--q); }
+.qbox > p { margin: 0 0 10px; font-size: 12.5px; color: var(--muted); }
+.qbox ol { margin: 0; padding-left: 20px; display: grid; gap: 10px; }
+.qbox li { font-size: 13px; }
+.qbox li::marker { color: var(--q); font-family: var(--mono); font-size: 12px; }
+.hint { display: block; margin-top: 3px; font-size: 12px; color: var(--dim); }
+code, .mono { font-family: var(--mono); font-size: 12.5px; }
+code { color: var(--code); }
+.muted { color: var(--muted); }
+.small { font-size: 12.5px; }
+.scroll { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 12.5px; font-variant-numeric: tabular-nums; }
+th, td { padding: 8px 10px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+th { color: var(--muted); font-weight: 500; white-space: nowrap; }
+tr:last-child td { border-bottom: 0; }
+td.paper { white-space: nowrap; color: var(--white); font-weight: 600; }
+td.paper span { display: block; font-family: var(--mono); font-size: 11px; color: var(--dim); font-weight: 400; }
+tr.next td { color: var(--q); }
+.table-min { min-width: 760px; }
+.pill { display: inline-block; font: 600 11px var(--mono); padding: 1px 7px; border-radius: 6px; border: 1px solid var(--line); color: var(--muted); }
+.pill.ok { color: var(--ok); border-color: rgba(110, 231, 183, 0.35); }
+.pill.warn { color: var(--warn); border-color: rgba(252, 211, 77, 0.35); }
+.pill.bad { color: var(--bad); border-color: rgba(253, 164, 175, 0.35); }
+.groups { display: inline-flex; gap: 4px; padding: 3px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; width: max-content; }
+.grp { font: 600 12.5px var(--font); color: var(--muted); background: transparent; border: 0; border-radius: 7px; padding: 6px 14px; cursor: pointer; }
+.grp[aria-pressed="true"] { background: var(--q); color: #1e1240; }
+.grp:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.tab[data-group="mech"][aria-selected="true"] { background: var(--q); border-color: var(--q); color: #1e1240; }
+.grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; }
+.card.warn { border-color: rgba(252, 211, 77, 0.35); }
+table.eq td, table.eq th { white-space: normal; }
+table.eq td:first-child { white-space: nowrap; }
+table.eq thead + tbody + thead th { padding-top: 16px; }
+pre { margin: 6px 0 0; background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; font: 12.5px/1.6 var(--mono); color: var(--fg); overflow-x: auto; }
+pre.flow { color: var(--accent); }
+.notice { margin-top: 10px; padding: 9px 11px; border-radius: 8px; background: var(--accent-soft); border: 1px solid rgba(94, 234, 212, 0.25); font-size: 12.5px; }
+.notice b { color: var(--accent); font: 600 11px var(--mono); letter-spacing: 0.05em; text-transform: uppercase; margin-right: 6px; }
+details { margin-top: 10px; border: 1px dashed rgba(196, 181, 253, 0.4); border-radius: 8px; padding: 8px 11px; }
+details summary { cursor: pointer; color: var(--q); font-size: 12.5px; font-weight: 600; }
+details[open] summary { margin-bottom: 4px; }
+ol.rules { margin: 0; padding-left: 20px; display: grid; gap: 8px; font-size: 13px; }
+footer { border-top: 1px solid var(--line); }
+footer .wrap { padding-block: 14px; color: var(--dim); font-size: 12px; }
+</style>
+
+<header>
+  <div class="wrap">
+    <div>
+      <div class="eyebrow">Genesis &middot; Stage 1-3 recap &middot; 2003 to 2016</div>
+      <h1>Before the Transformer: what to carry from Bengio to LayerNorm</h1>
+      <p class="sub">Seven papers, grouped by idea instead of by year. Each tab: what to remember, with our own numbers as evidence, and questions to answer while reading <em>Attention Is All You Need</em> (2017). The Mechanics part has the equations, shapes and backward pass of every block, each with a hand check.</p>
+    </div>
+    <div class="groups" role="group" aria-label="Part">
+      <button class="grp" data-group="ideas" aria-pressed="true">Ideas</button>
+      <button class="grp" data-group="mech" aria-pressed="false">Mechanics: forward &amp; backward</button>
+    </div>
+    <nav role="tablist" aria-label="Sections">
+      <button class="tab" role="tab" data-group="ideas" id="t-arc" aria-controls="arc">1. The arc</button>
+      <button class="tab" role="tab" data-group="ideas" id="t-tokens" aria-controls="tokens">2. Tokens &amp; embeddings</button>
+      <button class="tab" role="tab" data-group="ideas" id="t-sequence" aria-controls="sequence">3. Sequence &amp; memory</button>
+      <button class="tab" role="tab" data-group="ideas" id="t-attention" aria-controls="attention">4. Attention</button>
+      <button class="tab" role="tab" data-group="ideas" id="t-stability" aria-controls="stability">5. Gradients &amp; normalization</button>
+      <button class="tab" role="tab" data-group="ideas" id="t-training" aria-controls="training">6. Training &amp; experiments</button>
+      <button class="tab" role="tab" data-group="ideas" id="t-decoding" aria-controls="decoding">7. Decoding &amp; evaluation</button>
+      <button class="tab" role="tab" data-group="ideas" id="t-checklist" aria-controls="checklist">8. Reading checklist</button>
+      <button class="tab" role="tab" data-group="mech" id="t-m-rules" aria-controls="m-rules">M1. Conventions &amp; rules</button>
+      <button class="tab" role="tab" data-group="mech" id="t-m-blocks" aria-controls="m-blocks">M2. Softmax, CE, embedding</button>
+      <button class="tab" role="tab" data-group="mech" id="t-m-lm" aria-controls="m-lm">M3. Bengio, C&amp;W, Word2Vec, GloVe</button>
+      <button class="tab" role="tab" data-group="mech" id="t-m-rnn" aria-controls="m-rnn">M4. RNN, BPTT, GRU</button>
+      <button class="tab" role="tab" data-group="mech" id="t-m-attn" aria-controls="m-attn">M5. Bahdanau step</button>
+      <button class="tab" role="tab" data-group="mech" id="t-m-norm" aria-controls="m-norm">M6. LayerNorm &amp; BatchNorm</button>
+      <button class="tab" role="tab" data-group="mech" id="t-m-decode" aria-controls="m-decode">M7. Decoding, BPE, BLEU</button>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <div class="wrap">
+
+    <!-- 1. ARC -->
+    <section role="tabpanel" id="arc" aria-labelledby="t-arc">
+      <div class="lead">
+        <div class="eyebrow">Is 2017 the start of the current era?</div>
+        <h2>Yes for the architecture. The recipe comes in the next three years.</h2>
+        <p>Almost every major model after 2017 is a Transformer, so this paper starts the current architecture. The current era also needs two ideas still ahead on the reading list: pretraining on unlabelled text and then reusing the model (GPT-1, BERT, 2018), and scale (GPT-2, GPT-3, scaling laws).</p>
+        <p>Each paper so far fixed one bottleneck and exposed the next. The Transformer is easiest to understand as the answer to the bottlenecks still open in 2016.</p>
+      </div>
+      <div class="card">
+        <div class="scroll">
+          <table class="table-min">
+            <thead><tr><th>Paper</th><th>What it fixed</th><th>What it left open</th><th>Our evidence</th></tr></thead>
+            <tbody>
+              <tr><td class="paper">Bengio et al.<span>2003 &middot; NPLM</span></td><td>Learned word vectors and a neural LM: similar words share statistics through a shared lookup table <code>C</code>.</td><td>Fixed 5-word window. The <code>|V|</code>-way softmax costs 99.7% of compute. Word-level vocab.</td><td>WikiText-2 test PPL ~435 with era-faithful SGD (~356 with Adam).</td></tr>
+              <tr><td class="paper">Collobert &amp; Weston<span>2008</span></td><td>One shared embedding table for many tasks (POS, NER, chunking, LM); a ranking objective for the LM.</td><td>Multitask benefit claimed, but hard to show. Still a fixed window.</td><td>NER test micro F1 0.755 (Adam). Multitask vs single-task claim still untested.</td></tr>
+              <tr><td class="paper">Mikolov et al.<span>2013 &middot; Word2Vec</span></td><td>Dropped the hidden layer: cheap vectors from a huge corpus. Hierarchical softmax and negative sampling make the output cheap.</td><td>One static vector per word: "bank" has one vector for money and river.</td><td>Analogies: skip-gram 14.8%, CBOW 9.1%. The whole gap is named entities (17.5 vs 5.7); the rest ties (12.3 vs 12.2).</td></tr>
+              <tr><td class="paper">Pennington et al.<span>2014 &middot; GloVe</span></td><td>Vectors from global co-occurrence counts, a weighted log-count regression.</td><td>Same static-vector limit.</td><td><span class="pill warn">not reproduced</span> Loss fell but vectors stayed near their init (median cosine 0.99998). Analogy test never run.</td></tr>
+              <tr><td class="paper">Bahdanau et al.<span>2014 &middot; RNNsearch</span></td><td>Attention: the decoder reads every encoder state, not one fixed vector.</td><td>Still a sequential RNN: T steps per sentence, no parallelism over positions. Attention only from decoder to encoder.</td><td>Toy reverse: no-attention baseline 0.224 at length 46-50, attention 1.000. WMT14: 18.76 BLEU with beam 12.</td></tr>
+              <tr><td class="paper">Sennrich et al.<span>2016 &middot; BPE</span></td><td>Subword vocabulary: open vocabulary, zero &lt;UNK&gt;, sequences barely longer than words.</td><td>Segmentation is by frequency, not meaning.</td><td>1.08x word tokens, 0 UNK. +0.86 BLEU over word-level with beam; word model emits 15.6% &lt;UNK&gt;.</td></tr>
+              <tr><td class="paper">Ba et al.<span>2016 &middot; LayerNorm</span></td><td>Normalize each example over its features: no batch statistics, same at train and test, works inside RNNs.</td><td>Where to put it in a deep stack is not settled by this paper.</td><td>Gradient at <code>h_0</code> stays 2.868e-11 at every weight scale; vanilla RNN swings from 0 to 1.5e-5.</td></tr>
+              <tr class="next"><td class="paper" style="color:var(--q)">Vaswani et al.<span>2017 &middot; Transformer</span></td><td colspan="3">Next. Fill this row in yourself after reading: what does it fix, what does it leave open?</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- 2. TOKENS -->
+    <section role="tabpanel" id="tokens" aria-labelledby="t-tokens" hidden>
+      <div class="lead">
+        <div class="eyebrow">Representation</div>
+        <h2>What a token is, and what its vector knows</h2>
+        <p>Every model so far starts the same way: split text into symbols, look each one up in a table, and predict symbols at the output. The choices that matter are the vocabulary, what trains the vectors, and how expensive the output layer is.</p>
+      </div>
+      <div class="cols">
+        <div class="stack">
+          <div class="card">
+            <h3>An embedding lookup is a one-hot row times a matrix</h3>
+            <p><code>C[idx]</code> equals <code>one_hot(idx) @ C</code>. So the gradient only reaches the rows that were looked up in that batch, and a row that is never used never moves.</p>
+            <div class="ev"><b>Ours</b>In CBOW, a word's own input vector is updated only when it appears as a context word, which under-serves named entities. That is the live explanation for the Word2Vec entity gap.</div>
+          </div>
+          <div class="card">
+            <h3>Meaning comes from predicting context</h3>
+            <p>Words that predict similar neighbours end up with similar vectors, and a dot product scores how well two vectors match. Bengio, C&amp;W, Word2Vec and GloVe all train vectors this way; they differ in the objective and in cost.</p>
+            <div class="ev"><b>Ours</b>A falling loss is not proof of good vectors: our GloVe loss fell while directions barely moved from their random start.</div>
+          </div>
+          <div class="card">
+            <h3>Static vectors have one meaning per word</h3>
+            <p>Word2Vec and GloVe give "bank" one vector. In our project, the Bi-RNN encoder in Bahdanau was the first place where a word's vector depended on its sentence: <code>h_j</code> has read both sides.</p>
+          </div>
+          <div class="card">
+            <h3>The output layer is the expensive part</h3>
+            <p>Scoring every word costs <code>|V| &times; h</code> per position. In Bengio's model that is 99.7% of compute. Hierarchical softmax and negative sampling existed to avoid it.</p>
+            <div class="ev"><b>Ours</b>Negative sampling did not beat hierarchical softmax at text8 scale (14.2% vs 14.8%), unlike the paper's +12.</div>
+          </div>
+          <div class="card">
+            <h3>Vocabulary trades UNK against sequence length</h3>
+            <p>Words give short sequences and many &lt;UNK&gt;. Characters give no &lt;UNK&gt; and 4.65x longer sequences. BPE sits in between: 1.08x the length and no &lt;UNK&gt;, with a 30k vocabulary.</p>
+            <div class="ev"><b>Ours</b>The word-level model emits &lt;UNK&gt; for 15.6% of its tokens (beam), though only 6.1% of the reference needs it.</div>
+          </div>
+          <div class="card">
+            <h3>Input and output can share one space</h3>
+            <p>Bengio's energy variant embeds the candidate output word with the same matrix <code>C</code> as the input. That is the idea behind tying input and output embeddings.</p>
+          </div>
+        </div>
+        <aside class="qbox">
+          <h3>Carry into 2017</h3>
+          <p>Write a prediction before reading the section, then check it.</p>
+          <ol>
+            <li>Without recurrence, a bag of token vectors has no order. What must be added to each token vector, and should it be learned or a fixed function of position?</li>
+            <li>For En-De the paper uses one BPE vocabulary (~37k) shared by source and target; for En-Fr, our pair, a 32k word-piece vocabulary. It also ties the two embedding matrices and the pre-softmax layer. We used separate vocabularies (30,853 and 30,755). What does sharing buy?<span class="hint">Think about names and numbers that are copied from source to target.</span></li>
+            <li>Embeddings are multiplied by &radic;d_model before position information is added. Why could the relative size of the two matter?</li>
+          </ol>
+        </aside>
+      </div>
+    </section>
+
+    <!-- 3. SEQUENCE -->
+    <section role="tabpanel" id="sequence" aria-labelledby="t-sequence" hidden>
+      <div class="lead">
+        <div class="eyebrow">Context and memory</div>
+        <h2>The key quantity is path length between two tokens</h2>
+        <p>A fixed window cannot see far. A recurrent network can, in principle, but information and gradients have to travel through every step in between. Most of what broke so far is explained by how long that path is.</p>
+      </div>
+      <div class="cols">
+        <div class="stack">
+          <div class="card">
+            <h3>An RNN is one cell applied T times</h3>
+            <p>The same <code>W_xh</code> and <code>W_hh</code> are used at every step, so their gradient is a sum over steps. The gradient from step T to step 1 multiplies T-1 Jacobians <code>diag(f') W_hhᵀ</code>, so it vanishes or explodes.</p>
+          </div>
+          <div class="card">
+            <h3>The fixed-vector bottleneck is a learning problem, not a storage problem</h3>
+            <p>A sentence of 50 tokens from a 100-word vocabulary is about 330 bits, which fits easily in 512 floats. The vector could hold the sentence; training does not learn to put it there, because the path from the first word to the last output is too long.</p>
+            <div class="ev"><b>Ours</b>No-attention baseline at length 46-50: 0.224 token accuracy (H=64), 0.258 even with 11.6x the parameters. Low on the train set too, so it is not memorization.</div>
+          </div>
+          <div class="card">
+            <h3>Attention made one path short</h3>
+            <p>With attention, every source position is one step away from every decoder step. The encoder itself is still a chain: source word 1 reaches source word 50 through 49 recurrent steps.</p>
+          </div>
+          <div class="card">
+            <h3>The encoder may look both ways; the decoder may not</h3>
+            <p>A Bi-RNN encoder lets <code>h_j</code> see the whole sentence. The decoder cannot: at test time the future does not exist yet, and at training time seeing it would let the model copy the answer.</p>
+          </div>
+          <div class="card">
+            <h3>Recurrence is sequential compute</h3>
+            <p>Step t needs <code>h_(t-1)</code>, so positions cannot run in parallel. Only the batch dimension parallelizes.</p>
+            <div class="ev"><b>Ours</b>RNNsearch-50 at paper size: 0.615 s per step on a T4, about 25 hours for 7 epochs on 1.65M pairs.</div>
+          </div>
+          <div class="card">
+            <h3>Padding needs masks everywhere</h3>
+            <p>Padded positions must not leak: <code>-inf</code> before the attention softmax, frozen or packed RNN states, and the backward RNN must start at the real end of each sentence.</p>
+          </div>
+        </div>
+        <aside class="qbox">
+          <h3>Carry into 2017</h3>
+          <p>Write a prediction before reading the section, then check it.</p>
+          <ol>
+            <li>If every position attends to every other position in the same sentence, what is the path length between any two tokens? What does one layer cost as a function of T?<span class="hint">Compare with T sequential steps for an RNN.</span></li>
+            <li>With no recurrence, what can a training step parallelize over that our RNN could not? Predict how step time should change.</li>
+            <li>The decoder still must not see the future. Without an RNN, how do you stop position i from using positions after i during training? What shape is the thing that does it?</li>
+          </ol>
+        </aside>
+      </div>
+    </section>
+
+    <!-- 4. ATTENTION -->
+    <section role="tabpanel" id="attention" aria-labelledby="t-attention" hidden>
+      <div class="lead">
+        <div class="eyebrow">The mechanism that survives</div>
+        <h2>Query, key, value were already in Bahdanau</h2>
+        <p>The Transformer keeps attention and removes almost everything around it. So the most useful preparation is to know exactly what each part of our Bahdanau attention does, and which part is doing the real work.</p>
+      </div>
+      <div class="cols">
+        <div class="stack">
+          <div class="card">
+            <h3>Three roles</h3>
+            <p><strong>Query</strong>: the decoder state before the step, <code>s_(i-1)</code>. <strong>Keys</strong>: <code>U_a h_j</code>, computed once per sentence. <strong>Values</strong>: the encoder states <code>h_j</code>. Score each key, softmax over source positions, take the weighted sum of values.</p>
+          </div>
+          <div class="card">
+            <h3>Additive vs dot-product scores</h3>
+            <p>Bahdanau: <code>v_aᵀ tanh(W_a s + U_a h)</code>. Dot product with projections: <code>(s W_Q) &middot; (h W_K)</code>. The projections matter in both: they let the query and key live in a search space separate from the raw memory, and they fix any size mismatch. The dot product is one batched matrix multiply.</p>
+          </div>
+          <div class="card">
+            <h3>Shapes to know by heart</h3>
+            <p>Query <code>(B, 1, A)</code> broadcast against keys <code>(B, T, A)</code>; scores <code>(B, T)</code>; softmax over <code>T</code> (dim 1); context <code>bmm(&alpha;.unsqueeze(1), H)</code> gives <code>(B, 1, 2H)</code>, then <code>.squeeze(1)</code> gives <code>(B, 2H)</code>. A fully masked row gives NaN.</p>
+          </div>
+          <div class="card">
+            <h3>Attention is sharp only where the output needs the source</h3>
+            <div class="ev" style="margin-top:0"><b>Ours</b>Toy heatmap: 0.98-0.99 on the right source word for every word. The &lt;eos&gt; row put only 0.04-0.49 on source &lt;eos&gt;: the decoder state already knew when to stop, so the loss never forced it to look.</div>
+          </div>
+          <div class="card">
+            <h3>One query, one weighted average</h3>
+            <p>A single softmax gives one mixture of the source per decoder step. If a word needs two pieces of information from different places, one softmax has to compromise between them.</p>
+          </div>
+        </div>
+        <aside class="qbox">
+          <h3>Carry into 2017</h3>
+          <p>Write a prediction before reading the section, then check it.</p>
+          <ol>
+            <li>Bahdanau connects the decoder to the encoder. What happens if the queries, keys and values all come from the same sequence? What does each word's new vector then contain?</li>
+            <li>If q and k each have d independent components with mean 0 and variance 1, what is the variance of q&middot;k? What does a large spread of scores do to the softmax and its gradient?<span class="hint">This is the reason behind the paper's 1/&radic;d_k.</span></li>
+            <li>How would you get several different alignments per position instead of one? What would you have to split or repeat?</li>
+            <li>Of our six Bahdanau weight matrices, which ones turn into W_Q, W_K, W_V? What replaces the GRU cell?</li>
+          </ol>
+        </aside>
+      </div>
+    </section>
+
+    <!-- 5. STABILITY -->
+    <section role="tabpanel" id="stability" aria-labelledby="t-stability" hidden>
+      <div class="lead">
+        <div class="eyebrow">Can a deep stack train?</div>
+        <h2>Gradients multiply through depth; normalization keeps the scale in range</h2>
+        <p>An RNN is deep in time. A Transformer is deep in layers. The same tools explain both: the backprop shape rules, the product of Jacobians, and normalization that resets the scale at every step.</p>
+      </div>
+      <div class="cols">
+        <div class="stack">
+          <div class="card">
+            <h3>Backprop through a linear layer</h3>
+            <p><code>Y = X W + b</code> gives <code>dW = Xᵀ dY</code>, <code>dX = dY Wᵀ</code>, <code>db = dY.sum(0)</code>. A gradient always has the shape of the thing it belongs to; the transposes come from that.</p>
+          </div>
+          <div class="card">
+            <h3>Used N times forward, summed N times backward</h3>
+            <p>A broadcast bias, a shared RNN weight, an embedding row used twice in a batch: each use sends back its own gradient, and they add.</p>
+          </div>
+          <div class="card">
+            <h3>BatchNorm couples examples</h3>
+            <p>It normalizes each neuron across the batch. So it needs running statistics for test time, padding in one sentence corrupts the statistics for all, a batch of 1 breaks it, and in an RNN it would need separate statistics per time step.</p>
+          </div>
+          <div class="card">
+            <h3>LayerNorm normalizes each example on its own</h3>
+            <p><code>&mu;, &sigma;</code> per example over its H features, shape <code>(B, 1)</code>; learned gain and bias per feature, shape <code>(H,)</code>. Same formula at train and test. It is invariant to scaling the whole weight matrix or one input example, but not to scaling a single neuron's weights. BatchNorm is also invariant to the whole matrix, and the reverse on the other two: it is about rows vs columns of <code>(B, H)</code>.</p>
+            <div class="ev"><b>Ours</b><code>||dL/dh_0||</code> over 50 steps at weight scales 0.25 / 1 / 2.5: vanilla 0 / 1.9e-15 / 1.5e-5, LayerNorm 2.868e-11 at all three. On a memory task the vanilla RNN stayed at MSE 3.98 while the LayerNorm RNN reached 0.19.</div>
+          </div>
+          <div class="card">
+            <h3>Still open in the backprop playbook</h3>
+            <p class="muted">Elementwise nonlinearity, softmax + cross-entropy (<code>p - y</code>), deep chains and singular values, initialization as variance preservation, BPTT, BatchNorm and LayerNorm backward. Worth finishing the softmax and initialization steps before the Transformer's attention math.</p>
+          </div>
+        </div>
+        <aside class="qbox">
+          <h3>Carry into 2017</h3>
+          <p>Write a prediction before reading the section, then check it.</p>
+          <ol>
+            <li>For a residual block <code>y = x + F(x)</code>, what is <code>dy/dx</code>? What does it do to the product of Jacobians across many layers?</li>
+            <li>LayerNorm can sit after the residual add, <code>LN(x + F(x))</code>, or inside the branch, <code>x + F(LN(x))</code>. Which leaves a clean identity path for the gradient? Note which one the paper uses.</li>
+            <li>The paper warms the learning rate up before decaying it. Why could full-size steps be dangerous in the first few thousand updates?<span class="hint">The paper gives the schedule without a reason. One later explanation: Adam's second-moment estimate is unreliable when it has seen very few gradients.</span></li>
+          </ol>
+        </aside>
+      </div>
+    </section>
+
+    <!-- 6. TRAINING -->
+    <section role="tabpanel" id="training" aria-labelledby="t-training" hidden>
+      <div class="lead">
+        <div class="eyebrow">Habits that saved or cost days</div>
+        <h2>Most wrong conclusions came from the experiment, not the model</h2>
+        <p>These lessons are paper-independent. Each one is backed by a run where it mattered.</p>
+      </div>
+      <div class="cols">
+        <div class="stack">
+          <div class="card">
+            <h3>Check the batch averaging before copying a learning rate</h3>
+            <p>A per-example rate under a batch-mean loss is effectively divided by the batch size.</p>
+            <div class="ev"><b>Ours</b>C&amp;W: 0.01-0.1 proposed, 1.0 needed. Word2Vec: 0.025 at B=256 behaved like 0.025/256, with no learning in 10,000 steps.</div>
+          </div>
+          <div class="card">
+            <h3>Short sweeps pick unstable rates</h3>
+            <p>The large steps that win early are the ones that diverge later. Probe stability over a long stretch and watch weight norms. Abort on "absurd", not on "non-finite": a diverging loss stays finite for a long time.</p>
+            <div class="ev"><b>Ours</b>Word2Vec: a 1,000-step sweep ranked lr 2 as 2.7x better than lr 1; lr 2 diverged early in the epoch, lr 1 finished cleanly.</div>
+          </div>
+          <div class="card">
+            <h3>Undertrained is not the same as worse</h3>
+            <p>Compare models at their plateau, and quote the noise band, not one lucky checkpoint.</p>
+            <div class="ev"><b>Ours</b>Toy baseline at 10 epochs looked hopeless everywhere; it needed ~150 epochs (attention: 9). Its best checkpoint, val loss 1.0, was a dip inside a 1.1-1.2 noise band.</div>
+          </div>
+          <div class="card">
+            <h3>Change one thing, and read results per bucket</h3>
+            <p>Match the baseline on everything except the idea being tested (our attention vs no-attention: params within 2%). Then split the metric: averages hide where a model fails, and train vs val per bucket separates "cannot learn" from "memorizes".</p>
+            <div class="ev"><b>Ours</b>Word2Vec's skip-gram lead is entirely in named entities. The H=256 baseline memorizes lengths 21-40 and cannot fit 41-50 even on train.</div>
+          </div>
+          <div class="card">
+            <h3>Gate with a toy, cross-check implementations</h3>
+            <p>A task with a known answer (reversal, anti-diagonal attention) catches wiring bugs before an expensive run. Two implementations checked with <code>allclose</code> (packed GRU vs masked loop) catch subtle ones.</p>
+          </div>
+          <div class="card">
+            <h3>One run shows a direction, not a result</h3>
+            <p>Every comparison here is one seed. Short probes mislead too: a 1M-step Word2Vec probe showed a +0.4 gap where the full epoch showed +5.4 on the same comparison.</p>
+          </div>
+          <div class="card">
+            <h3>Long runs need a headless script</h3>
+            <p>Checkpoint and resume by experiment name, keep the run out of a live notebook kernel, load your own caches with <code>weights_only=False</code>, and write files atomically when an editor has them open.</p>
+          </div>
+        </div>
+        <aside class="qbox">
+          <h3>Carry into 2017</h3>
+          <p>Write a prediction before reading the section, then check it.</p>
+          <ol>
+            <li>The paper measures batches in tokens, not sentences. How does that change what a learning rate means, compared with our batch of 80 sentences?</li>
+            <li>If we train a small Transformer on our WMT14 data, what must match our RNNsearch run for the comparison to be fair? List the fixed things before the free ones.</li>
+            <li>Which result in the paper would you most want a second seed for, and why?</li>
+          </ol>
+        </aside>
+      </div>
+    </section>
+
+    <!-- 7. DECODING -->
+    <section role="tabpanel" id="decoding" aria-labelledby="t-decoding" hidden>
+      <div class="lead">
+        <div class="eyebrow">From model to number</div>
+        <h2>How you decode and score can move results more than the model</h2>
+        <p>Beam search added more BLEU than BPE did. Pitfalls in BLEU scoring changed scores silently. A number only means something with its decoding and scoring setup next to it.</p>
+      </div>
+      <div class="cols">
+        <div class="stack">
+          <div class="card">
+            <h3>Teacher forcing vs free running</h3>
+            <p>Training feeds the true previous token; decoding feeds the model's own guess. The model is never trained on its own mistakes, so one bad token can derail the rest.</p>
+            <div class="ev"><b>Ours</b>Greedy word-level output has &lt;UNK&gt; runs averaging 2.67 against 1.08 in the reference, and one run of 160 that never stopped.</div>
+          </div>
+          <div class="card">
+            <h3>Beam search is free BLEU</h3>
+            <p>Keep K hypotheses, freeze the finished ones, pick by score divided by length. Raw log-probability favours short outputs, so some length correction is needed.</p>
+            <div class="ev"><b>Ours</b>Beam 12 adds +3.5 BLEU to both word-level (15.23 &rarr; 18.76) and BPE (16.11 &rarr; 19.62). The BPE gap stays ~0.9.</div>
+          </div>
+          <div class="card">
+            <h3>Losses in different units do not compare</h3>
+            <p>Perplexity is <code>exp(mean cross-entropy)</code> per token, so it depends on what a token is. BPE val loss is per subword, word-level per word: compare them by BLEU only.</p>
+          </div>
+          <div class="card">
+            <h3>BLEU is easy to get subtly wrong</h3>
+            <p>Score against the original reference tokens (reference ids turn rare words into &lt;UNK&gt; that then match), do not tokenize twice, cut at EOS. The n-gram breakdown shows where a gain sits.</p>
+            <div class="ev"><b>Ours</b>BPE's gain is mostly unigram precision (+3.6 greedy). Reference from ids inflated BLEU; a lost <code>tokenize="none"</code> changed it.</div>
+          </div>
+          <div class="card">
+            <h3>Test the paper's own claim</h3>
+            <p>A proxy metric can pass while the claim stays untested. GloVe was closed without its analogy test, so it is not a reproduction. BPE's real claim is about rare and unseen words: its unigram F1 is still open.</p>
+          </div>
+        </div>
+        <aside class="qbox">
+          <h3>Carry into 2017</h3>
+          <p>Write a prediction before reading the section, then check it.</p>
+          <ol>
+            <li>The paper says label smoothing hurts perplexity but improves BLEU. Using PPL = exp(cross-entropy), explain how both can be true.<span class="hint">What does label smoothing do to how confident the model is allowed to be on the right token?</span></li>
+            <li>The paper decodes with beam search and a length penalty tuned on the dev set. Why does a beam need a length penalty at all?</li>
+            <li>The paper averages the last few checkpoints. Given our noise band around "best" checkpoints, why might averaging weights help?</li>
+          </ol>
+        </aside>
+      </div>
+    </section>
+
+    <!-- 8. CHECKLIST -->
+    <section role="tabpanel" id="checklist" aria-labelledby="t-checklist" hidden>
+      <div class="lead">
+        <div class="eyebrow">Before you open the PDF</div>
+        <h2>Bottlenecks still open in 2016, and where to look for each</h2>
+        <p>Read the paper as a list of answers to this table. For each row, write down your guess first. The last column says what to look for, not what the answer is.</p>
+      </div>
+      <div class="card">
+        <div class="scroll">
+          <table class="table-min">
+            <thead><tr><th>Bottleneck</th><th>Where we felt it</th><th>Our number</th><th>Look for in the paper</th></tr></thead>
+            <tbody>
+              <tr><td>Sequential compute</td><td>Every RNN we trained</td><td>0.615 s/step, ~25 h for 7 epochs</td><td>What replaces recurrence, and what one step parallelizes over</td></tr>
+              <tr><td>Long path between tokens</td><td>Toy baseline, BPTT</td><td>0.224 at length 46-50</td><td>The path-length column in the complexity table</td></tr>
+              <tr><td>Words see only one side, or one fixed meaning</td><td>Word2Vec, GloVe, Bi-RNN</td><td>One vector for "bank"</td><td>How a word's vector changes from layer to layer</td></tr>
+              <tr><td>Order for free</td><td>RNNs had it; attention alone does not</td><td>-</td><td>Positional encoding, and why that particular function</td></tr>
+              <tr><td>Decoder must not see the future</td><td>Bi-RNN decoder discussion</td><td>-</td><td>The mask in decoder self-attention</td></tr>
+              <tr><td>One alignment per step</td><td>Bahdanau softmax</td><td>-</td><td>Multi-head attention and how the dimension is split</td></tr>
+              <tr><td>Score scale</td><td>Dot product variance</td><td>-</td><td>The 1/&radic;d_k factor</td></tr>
+              <tr><td>Training a deep stack</td><td>LayerNorm experiments</td><td>Gradient stable at 2.868e-11</td><td>Residual connections, LayerNorm placement, warmup schedule</td></tr>
+              <tr><td>Open vocabulary</td><td>Bahdanau word model</td><td>15.6% &lt;UNK&gt;</td><td>Shared BPE vocabulary and tied embeddings</td></tr>
+              <tr><td>Fair evaluation</td><td>Our BLEU pitfalls</td><td>Beam +3.5</td><td>Their beam size, length penalty, checkpoint averaging, BLEU setup</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="cols">
+        <div class="card">
+          <h3>Three predictions to write down now</h3>
+          <p>1. One self-attention layer costs more than one RNN layer when the sentence is long. At what sentence length would you guess the two cross, for a hidden size of 512?</p>
+          <p>2. If you shuffle the input words of a Transformer with no position information, what happens to its output vectors?</p>
+          <p>3. On our En-Fr data, would a small Transformer beat our RNNsearch-50 at equal training time? Say why before checking the paper's training-cost table.</p>
+        </div>
+        <div class="card">
+          <h3>Still open from earlier papers</h3>
+          <p class="small muted">Not blockers for the Transformer; return to them later.</p>
+          <p class="small">BPE: unigram F1 for all / rare / OOV words, chrF3. Bahdanau: Fig. 2 BLEU by length (needs RNNencdec-50), No-UNK column. GloVe: analogy test. C&amp;W: multitask vs single-task. Word2Vec: entropy test for the entity gap.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== MECHANICS ===================== -->
+
+    <!-- M1. CONVENTIONS -->
+    <section role="tabpanel" id="m-rules" aria-labelledby="t-m-rules" hidden>
+      <div class="lead">
+        <div class="eyebrow">Mechanics &middot; read this first</div>
+        <h2>Conventions and the four backward rules</h2>
+        <p>Same conventions as our notebooks: batch first, rows are examples, right multiplication <code>Y = X W</code> with <code>W</code> of shape <code>(in, out)</code>. Every block on the next tabs is written as a forward table, a backward table, a hand check, and what to notice.</p>
+      </div>
+      <div class="grid2">
+        <div class="card">
+          <h3>Symbols</h3>
+          <table class="eq">
+            <tbody>
+              <tr><td><code>B</code></td><td>batch size</td></tr>
+              <tr><td><code>T</code>, <code>T_in</code></td><td>sequence length (source)</td></tr>
+              <tr><td><code>D</code></td><td>embedding size</td></tr>
+              <tr><td><code>H</code></td><td>hidden size (Bi-RNN states are <code>2H</code>)</td></tr>
+              <tr><td><code>A</code></td><td>attention size</td></tr>
+              <tr><td><code>V</code></td><td>vocabulary size</td></tr>
+              <tr><td><code>T_out</code></td><td>target length; <code>N</code> = number of non-pad target tokens in the batch</td></tr>
+              <tr><td><code>n</code>, <code>h</code></td><td>Bengio: context words, hidden size</td></tr>
+              <tr><td><code>l</code></td><td>Bahdanau maxout size (paper: 500)</td></tr>
+              <tr><td><code>K</code></td><td>beam width (M7); keys are written <code>K</code> only inside M5</td></tr>
+              <tr><td><code>o</code></td><td>logits, always (M2-M5)</td></tr>
+              <tr><td><code>&sigma;(&middot;)</code></td><td>sigmoid only; a standard deviation is written <code>std</code></td></tr>
+              <tr><td><code>dX</code></td><td>&part;L/&part;X, always the same shape as <code>X</code></td></tr>
+              <tr><td><code>&odot;</code></td><td>elementwise product</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="card">
+          <h3>The four backward rules</h3>
+          <ol class="rules">
+            <li><strong>Shape rule.</strong> A gradient has the shape of its tensor. For <code>Y = X W</code>: <code>dW = Xᵀ dY</code>, <code>dX = dY Wᵀ</code>. The transposes are forced by the shapes.</li>
+            <li><strong>Elementwise rule.</strong> For <code>u = f(a)</code> (<code>a</code> = pre-activation, <code>u</code> = output): <code>da = du &odot; f'(a)</code>. Written with the output: tanh' = <code>1 - u²</code>, sigmoid' = <code>u(1 - u)</code>; ReLU' = <code>1[a &gt; 0]</code>.</li>
+            <li><strong>Fan-out rule.</strong> A tensor used k times forward gets k gradients backward, and they add. Shared RNN weights, an embedding row used twice, <code>c_i</code> going into both the GRU and the output.</li>
+            <li><strong>Broadcast rule.</strong> A broadcast forward is a copy, so backward sums over the broadcast axis: <code>db = dY.sum(0)</code>; the attention query <code>(B, 1, A)</code> sums over <code>T</code>.</li>
+          </ol>
+        </div>
+        <div class="card">
+          <h3>How to dry-run any model</h3>
+          <ol class="rules">
+            <li>Write every forward tensor with its shape, in order.</li>
+            <li>Mark what backward will need: each op's inputs and outputs (activations). This is what memory holds during training.</li>
+            <li>Start from <code>dlogits</code> and walk the list in reverse, one op at a time.</li>
+            <li>After each step, check the gradient's shape against its tensor. A wrong shape is almost always a missing transpose or a missing sum.</li>
+            <li>Verify on tiny sizes with autograd, or with a finite difference <code>(L(&theta;+&epsilon;) - L(&theta;-&epsilon;)) / 2&epsilon;</code>.</li>
+          </ol>
+        </div>
+        <div class="card">
+          <h3>Linear layer, hand check</h3>
+          <p><code>X = [[1, 2]]</code>, <code>W = [[1, 0, -1], [2, 1, 0]]</code>, <code>b = [0, 0, 1]</code>. Take <code>L = sum(Y &odot; G)</code> with <code>G = [[1, -1, 2]]</code>, so <code>dY = G</code>. Find <code>Y</code>, <code>dW</code>, <code>dX</code>, <code>db</code>.</p>
+          <details><summary>Show answer</summary>
+            <pre>Y  = [5, 2, 0]
+dW = Xᵀ G = [[1, -1, 2],
+             [2, -2, 4]]
+dX = G Wᵀ = [-1, 1]
+db = [1, -1, 2]</pre>
+          </details>
+        </div>
+      </div>
+    </section>
+
+    <!-- M2. CORE BLOCKS -->
+    <section role="tabpanel" id="m-blocks" aria-labelledby="t-m-blocks" hidden>
+      <div class="lead">
+        <div class="eyebrow">Mechanics &middot; building blocks</div>
+        <h2>Softmax, cross-entropy, embedding, maxout</h2>
+        <p>Every model in this project ends with softmax + cross-entropy and starts with an embedding lookup. Attention uses softmax without cross-entropy, which has a different backward.</p>
+      </div>
+      <div class="card">
+        <h3>Softmax + cross-entropy (the output of every model)</h3>
+        <div class="scroll"><table class="eq">
+          <thead><tr><th>forward</th><th>equation</th><th>shape</th></tr></thead>
+          <tbody>
+            <tr><td>logits</td><td><code>o</code>; for a sequence model, flattened to <code>(B&middot;T_out, V)</code></td><td><code>(B, V)</code></td></tr>
+            <tr><td>probabilities</td><td><code>p = exp(o) / sum_V exp(o)</code>, per row</td><td><code>(B, V)</code></td></tr>
+            <tr><td>loss</td><td><code>L = -(1/N) &Sigma; log p[row, y_row]</code> over the N non-pad rows (<code>CrossEntropyLoss(ignore_index=PAD)</code>; N = B without padding)</td><td>scalar</td></tr>
+          </tbody>
+          <thead><tr><th>backward</th><th>equation</th><th>shape</th></tr></thead>
+          <tbody>
+            <tr><td><code>do</code></td><td><code>(p - onehot(y)) / N</code>; rows whose target is PAD get exactly 0</td><td><code>(B, V)</code></td></tr>
+          </tbody>
+        </table></div>
+        <div class="notice"><b>Notice</b>Each row of <code>do</code> sums to 0: the right class is pushed up by exactly as much as all the others are pushed down. Perplexity is <code>exp(L)</code>.</div>
+        <details><summary>Hand check: o = [2, 1, 0], y = 0, N = 1</summary>
+          <pre>p  = [0.6652, 0.2447, 0.0900]
+L  = -log 0.6652 = 0.4076      (perplexity e^0.4076 = 1.503)
+do = [-0.3348, 0.2447, 0.0900]</pre>
+        </details>
+      </div>
+      <div class="grid2">
+        <div class="card">
+          <h3>Softmax alone (attention weights)</h3>
+          <p>When softmax is not followed by cross-entropy, use its Jacobian. For <code>p = softmax(e)</code> and an upstream <code>dp</code>:</p>
+          <pre>de = p &odot; (dp - &Sigma;_j p_j dp_j)</pre>
+          <div class="notice"><b>Notice</b>If every <code>dp_j</code> is equal, <code>de = 0</code>: adding a constant to all scores changes nothing. Only differences between scores get gradient.</div>
+          <details><summary>Hand check: e = [2, 1, 0], dp = [1, 0, 0]</summary>
+            <pre>p  = [0.6652, 0.2447, 0.0900]
+&Sigma; p_j dp_j = 0.6652
+de = [0.2227, -0.1628, -0.0599]</pre>
+          </details>
+        </div>
+        <div class="card">
+          <h3>Embedding lookup</h3>
+          <table class="eq"><tbody>
+            <tr><td>forward</td><td><code>E = C[idx]</code></td><td><code>C (V, D)</code>, <code>idx (B, T)</code> &rarr; <code>(B, T, D)</code></td></tr>
+            <tr><td>backward</td><td>scatter-add each row of <code>dE</code> into <code>dC[idx]</code></td><td><code>(V, D)</code>, mostly zeros</td></tr>
+          </tbody></table>
+          <div class="notice"><b>Notice</b>Same as <code>one_hot(idx) @ C</code>. Rows that were not looked up get zero gradient. A repeated id adds up (fan-out rule).</div>
+          <details><summary>Hand check: V = 4, D = 2, idx = [2, 0, 2], dE = [[1,0],[0,1],[2,2]]</summary>
+            <pre>dC[0] = [0, 1]
+dC[2] = [1,0] + [2,2] = [3, 2]
+dC[1] = dC[3] = [0, 0]</pre>
+          </details>
+        </div>
+        <div class="card">
+          <h3>Maxout (Bahdanau output layer)</h3>
+          <table class="eq"><tbody>
+            <tr><td>forward</td><td><code>t = t̃.view(B, l, 2).max(dim=2).values</code></td><td><code>(B, 2l)</code> &rarr; <code>(B, l)</code></td></tr>
+            <tr><td>backward</td><td>gradient goes only to the larger element of each pair</td><td><code>(B, 2l)</code></td></tr>
+          </tbody></table>
+          <div class="notice"><b>Notice</b>Like ReLU, it routes the gradient instead of scaling it. The loser of each pair gets exactly 0.</div>
+          <details><summary>Hand check: t̃ = [3, -1, 0.5, 2], dt = [1, 1]</summary>
+            <pre>t   = [max(3,-1), max(0.5,2)] = [3, 2]
+dt̃  = [1, 0, 0, 1]</pre>
+          </details>
+        </div>
+        <div class="card">
+          <h3>Elementwise nonlinearity</h3>
+          <p><code>a = [2, -1, 0.5]</code>, <code>u = relu(a)</code>, <code>du = [1, 2, 3]</code>. Find <code>da</code>.</p>
+          <details><summary>Show answer</summary>
+            <pre>da = du &odot; 1[a &gt; 0] = [1, 0, 3]</pre>
+          </details>
+          <div class="notice"><b>Notice</b>tanh' = <code>1 - u²</code> is at most 1 and near 0 when the output <code>|u|</code> is near 1. That factor is what shrinks gradients through a saturated RNN.</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- M3. BENGIO + WORD2VEC + GLOVE -->
+    <section role="tabpanel" id="m-lm" aria-labelledby="t-m-lm" hidden>
+      <div class="lead">
+        <div class="eyebrow">Mechanics &middot; 2003-2014</div>
+        <h2>Bengio's MLP, C&amp;W, Word2Vec and GloVe, forward and backward</h2>
+        <p>Four ways to train word vectors. The interesting part is where the gradient for each word vector comes from, and what the output layer costs.</p>
+      </div>
+      <div class="card">
+        <h3>Bengio 2003: <code>o = b_o + x W + tanh(x W_1 + b_1) U</code></h3>
+        <p class="small muted">Paper names: <code>W_1</code> is H, <code>b_1</code> is d, <code>b_o</code> is b. Renamed here so that <code>H</code> stays a size and <code>d</code> stays the gradient prefix.</p>
+        <pre class="flow">idx (B, n) --C--&gt; (B, n, D) --reshape--&gt; x (B, nD) --W_1, b_1--&gt; a (B, h) --tanh--&gt; u (B, h)
+                                            |                                            |
+                                            +-------------- W (direct) -------+          U
+                                                                              v          v
+                                                              o = b_o + x W + u U  (B, V) --&gt; softmax + CE</pre>
+        <div class="scroll"><table class="eq">
+          <thead><tr><th>backward, in order</th><th>equation</th><th>shape</th></tr></thead>
+          <tbody>
+            <tr><td><code>do</code></td><td><code>(p - onehot) / B</code></td><td><code>(B, V)</code></td></tr>
+            <tr><td><code>dU</code>, <code>dW</code>, <code>db_o</code></td><td><code>uᵀ do</code>, <code>xᵀ do</code>, <code>do.sum(0)</code></td><td><code>(h, V)</code>, <code>(nD, V)</code>, <code>(V,)</code></td></tr>
+            <tr><td><code>du</code> &rarr; <code>da</code></td><td><code>do Uᵀ</code>, then <code>&odot; (1 - u²)</code></td><td><code>(B, h)</code></td></tr>
+            <tr><td><code>dW_1</code>, <code>db_1</code></td><td><code>xᵀ da</code>, <code>da.sum(0)</code></td><td><code>(nD, h)</code>, <code>(h,)</code></td></tr>
+            <tr><td><code>dx</code></td><td><code>do Wᵀ + da W_1ᵀ</code> (two paths, fan-out rule)</td><td><code>(B, nD)</code></td></tr>
+            <tr><td><code>dC</code></td><td>reshape <code>dx</code> to <code>(B, n, D)</code>, scatter-add into rows <code>idx</code></td><td><code>(V, D)</code></td></tr>
+          </tbody>
+        </table></div>
+        <div class="notice"><b>Notice</b>Per example the output costs <code>V(h + nD)</code> multiply-adds and the hidden layer <code>nD &middot; h</code>. With V in the tens of thousands, the output is ~99.7% of the work.</div>
+      </div>
+      <div class="grid2">
+        <div class="card">
+          <h3>Bengio's energy variant: the output word goes through the input side</h3>
+          <table class="eq"><tbody>
+            <tr><td>input per candidate</td><td><code>x_w = [x_context ; C[w]]</code>, for every candidate word <code>w</code></td><td><code>(V, (n+1)D)</code> per example</td></tr>
+            <tr><td>hidden, energy</td><td><code>u_w = tanh(x_w W_1 + b_1)</code>, <code>E_w = v &middot; u_w + biases</code></td><td><code>(V, h)</code>, <code>(V,)</code></td></tr>
+            <tr><td>probability</td><td><code>p = softmax(-E)</code>, loss <code>-log p_y</code></td><td><code>(V,)</code></td></tr>
+            <tr><td><code>dE_w</code></td><td><code>-(p_w - 1[w = y])</code></td><td><code>(V,)</code></td></tr>
+            <tr><td>into <code>v</code></td><td><code>dv = &Sigma;_w dE_w u_w</code></td><td><code>(h,)</code></td></tr>
+            <tr><td>into <code>W_1</code>, <code>b_1</code></td><td><code>du_w = dE_w v</code>, <code>da_w = du_w &odot; (1 - u_w²)</code>, <code>dW_1 = &Sigma;_w x_wᵀ da_w</code>, <code>db_1 = &Sigma;_w da_w</code></td><td><code>((n+1)D, h)</code>, <code>(h,)</code></td></tr>
+            <tr><td>into <code>C</code></td><td><code>dx_w = da_w W_1ᵀ</code>; the context part is summed over all w; the last D entries go to <code>dC[w]</code></td><td><code>((n+1)D,)</code> per w</td></tr>
+          </tbody></table>
+          <div class="notice"><b>Notice</b>The output word uses the same table <code>C</code> as the input words, so one embedding learns from both roles: the idea behind tying input and output embeddings. The price: the hidden layer runs once per candidate, V times per example.</div>
+          <details><summary>Hand check: two candidates, E = [1, 0], true word y = 0</summary>
+            <pre>p   = softmax(-E) = softmax([-1, 0]) = [0.2689, 0.7311]
+L   = -log 0.2689 = 1.3133
+dE  = [0.7311, -0.7311]</pre>
+            <p class="small muted">Gradient descent subtracts <code>dE</code>: the true word's energy goes down, the other one's goes up.</p>
+          </details>
+        </div>
+        <div class="card">
+          <h3>Collobert &amp; Weston: ranking loss instead of a softmax</h3>
+          <table class="eq"><tbody>
+            <tr><td>score</td><td><code>f(window) = &phi;(x W_1 + b_1) w_2 + b_2</code>, with <code>x</code> the concatenated window embeddings</td><td>scalar per window</td></tr>
+            <tr><td>corrupt</td><td><code>x̃</code>: the same window with the centre word replaced by a random word</td><td></td></tr>
+            <tr><td>loss</td><td><code>L = max(0, 1 - f(x) + f(x̃))</code></td><td>scalar</td></tr>
+            <tr><td><code>df(x)</code>, <code>df(x̃)</code></td><td><code>-1</code> and <code>+1</code> if <code>1 - f(x) + f(x̃) &gt; 0</code>, else both 0</td><td></td></tr>
+            <tr><td>then</td><td>ordinary backward through the MLP twice (real and corrupt window), summed into the shared weights and embedding rows</td><td></td></tr>
+          </tbody></table>
+          <div class="notice"><b>Notice</b>There is no V-way output at all: the cost of one update does not depend on the vocabulary size. And once the real window wins by a margin of 1, the pair stops sending gradient.</div>
+          <details><summary>Hand check: two cases</summary>
+            <pre>f(x) = 0.3, f(x̃) = 0.5  -&gt; L = 1 - 0.3 + 0.5 = 1.2
+                          df(x) = -1, df(x̃) = +1
+f(x) = 2.0, f(x̃) = 0.5  -&gt; L = max(0, -0.5) = 0
+                          no gradient</pre>
+          </details>
+        </div>
+      </div>
+      <div class="grid2">
+        <div class="card">
+          <h3>Skip-gram with negative sampling</h3>
+          <table class="eq"><tbody>
+            <tr><td>vectors</td><td><code>v_c = V_in[center]</code>, <code>u_o = V_out[context]</code>, <code>u_k</code> for each of the m sampled negatives (<code>u</code> here is an output vector, not a tanh output)</td></tr>
+            <tr><td>loss</td><td><code>L = -log &sigma;(u_o&middot;v_c) - &Sigma;_k log &sigma;(-u_k&middot;v_c)</code></td></tr>
+            <tr><td><code>dv_c</code></td><td><code>(&sigma;(u_o&middot;v_c) - 1) u_o + &Sigma;_k &sigma;(u_k&middot;v_c) u_k</code></td></tr>
+            <tr><td><code>du_o</code></td><td><code>(&sigma;(u_o&middot;v_c) - 1) v_c</code></td></tr>
+            <tr><td><code>du_k</code></td><td><code>&sigma;(u_k&middot;v_c) v_c</code></td></tr>
+          </tbody></table>
+          <div class="notice"><b>Notice</b>Each term is <code>(prediction - label)</code> times the other vector, the same pattern as softmax + CE, but for m+1 binary classifiers instead of one V-way softmax. Hierarchical softmax is the same binary classifier at each of ~log₂V tree nodes.</div>
+          <details><summary>Hand check: v_c = [1, 0], u_o = [1, 1], one negative u_k = [0, 1]</summary>
+            <pre>u_o&middot;v_c = 1 -&gt; &sigma; = 0.7311     u_k&middot;v_c = 0 -&gt; &sigma; = 0.5
+L    = 0.3133 + 0.6931 = 1.0064
+dv_c = -0.2689 [1,1] + 0.5 [0,1] = [-0.2689, 0.2311]
+du_o = [-0.2689, 0]
+du_k = [0.5, 0]</pre>
+          </details>
+        </div>
+        <div class="card">
+          <h3>CBOW: the average splits the gradient</h3>
+          <p><code>v = (1/n) &Sigma;_j V_in[ctx_j]</code>, then the same output head with <code>v</code> in place of <code>v_c</code>. Backward: <code>dv</code> is the <code>dv_c</code> formula from the card on the left, and each context word's row gets <code>dv / n</code>.</p>
+          <div class="notice"><b>Notice</b>The centre word's input vector is never updated when it is the centre; it only moves when it appears as someone else's context. That is the live hypothesis for CBOW losing on named entities.</div>
+        </div>
+        <div class="card">
+          <h3>GloVe: weighted least squares on log counts</h3>
+          <table class="eq"><tbody>
+            <tr><td>residual</td><td><code>e_ij = w_i&middot;w̃_j + b_i + b̃_j - log X_ij</code></td></tr>
+            <tr><td>loss</td><td><code>J = &Sigma; f(X_ij) e_ij²</code>, <code>f(x) = min(1, (x / x_max)^0.75)</code></td></tr>
+            <tr><td><code>dw_i</code></td><td><code>&Sigma;_j 2 f(X_ij) e_ij w̃_j</code> (summed over the pairs in the batch)</td></tr>
+            <tr><td><code>dw̃_j</code></td><td><code>&Sigma;_i 2 f(X_ij) e_ij w_i</code></td></tr>
+            <tr><td><code>db_i</code>, <code>db̃_j</code></td><td><code>&Sigma;_j 2 f(X_ij) e_ij</code>, <code>&Sigma;_i 2 f(X_ij) e_ij</code></td></tr>
+          </tbody></table>
+          <div class="notice"><b>Analysis hook</b>Our GloVe vectors barely changed direction while the loss fell. From <code>dw_i = 2 f e w̃_j</code>: <code>w_i</code> only moves along context vectors. And the biases can absorb the residual <code>e</code> without any vector moving. Which of the two would you test first?</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- M4. RNN -->
+    <section role="tabpanel" id="m-rnn" aria-labelledby="t-m-rnn" hidden>
+      <div class="lead">
+        <div class="eyebrow">Mechanics &middot; recurrence</div>
+        <h2>RNN step, BPTT, and the GRU's extra path</h2>
+        <p>Backprop through time is ordinary backprop on the unrolled graph. Two things make it special: the same weights are used at every step (sum their gradients), and the gradient to early steps passes through a product of Jacobians.</p>
+      </div>
+      <div class="card">
+        <h3>Vanilla RNN</h3>
+        <div class="scroll"><table class="eq">
+          <thead><tr><th>forward, step t</th><th>equation</th><th>shape</th></tr></thead>
+          <tbody>
+            <tr><td>pre-activation</td><td><code>a_t = x_t W_xh + h_(t-1) W_hh + b</code></td><td><code>(B, H)</code></td></tr>
+            <tr><td>state</td><td><code>h_t = tanh(a_t)</code></td><td><code>(B, H)</code></td></tr>
+            <tr><td>output</td><td><code>o_t = h_t W_hy + b_y</code>, then softmax + CE per step</td><td><code>(B, V)</code></td></tr>
+          </tbody>
+          <thead><tr><th>backward, t = T down to 1</th><th>equation</th><th>shape</th></tr></thead>
+          <tbody>
+            <tr><td>start</td><td><code>dh_next = 0</code> at <code>t = T</code>; <code>do_t = (p_t - onehot(y_t)) / N</code> from M2</td><td></td></tr>
+            <tr><td><code>dW_hy</code>, <code>db_y</code></td><td><code>+= h_tᵀ do_t</code>, <code>+= do_t.sum(0)</code></td><td><code>(H, V)</code>, <code>(V,)</code></td></tr>
+            <tr><td><code>dh_t</code></td><td><code>do_t W_hyᵀ + dh_next</code> (from the output and from step t+1)</td><td><code>(B, H)</code></td></tr>
+            <tr><td><code>da_t</code></td><td><code>dh_t &odot; (1 - h_t²)</code></td><td><code>(B, H)</code></td></tr>
+            <tr><td><code>dW_xh</code>, <code>dW_hh</code>, <code>db</code></td><td><code>+= x_tᵀ da_t</code>, <code>+= h_(t-1)ᵀ da_t</code>, <code>+= da_t.sum(0)</code></td><td><code>(D, H)</code>, <code>(H, H)</code>, <code>(H,)</code></td></tr>
+            <tr><td><code>dx_t</code>, <code>dh_next</code></td><td><code>da_t W_xhᵀ</code>, <code>da_t W_hhᵀ</code>; after t = 1, <code>dh_next</code> is <code>dh_0</code></td><td><code>(B, D)</code>, <code>(B, H)</code></td></tr>
+          </tbody>
+        </table></div>
+        <div class="notice"><b>Notice</b>From step T back to step 1 the gradient is multiplied T-1 times by <code>diag(1 - h²) W_hhᵀ</code>. If that factor is below 1 in size it vanishes, above 1 it explodes. This is the long path from tab 3.</div>
+        <details><summary>Hand check: H = 1, W_xh = 1, W_hh = 0.5, h_0 = 0, x = [1, 1], L = h_2</summary>
+          <pre>h_1 = tanh(1)                = 0.7616
+h_2 = tanh(1 + 0.5 &middot; 0.7616)   = 0.8811
+da_2 = 1 &middot; (1 - 0.8811²)       = 0.2236
+dh_1 = da_2 &middot; W_hh             = 0.1118
+da_1 = 0.1118 &middot; (1 - 0.7616²)  = 0.0470
+dW_xh = x_1 da_1 + x_2 da_2     = 0.2706
+dW_hh = h_0 da_1 + h_1 da_2     = 0.1703</pre>
+        </details>
+      </div>
+      <div class="grid2">
+        <div class="card">
+          <h3>GRU, paper form (the Bahdanau paper adds <code>c_i</code> to each gate)</h3>
+          <pre>z  = &sigma;(x W_z + h U_z + c C_z)          update gate
+r  = &sigma;(x W_r + h U_r + c C_r)          reset gate
+h̃  = tanh(x W + (r &odot; h) U + c C)      candidate
+h' = (1 - z) &odot; h + z &odot; h̃</pre>
+          <div class="notice"><b>Notice</b><code>&part;h'/&part;h</code> contains the term <code>(1 - z)</code> with no weight matrix and no tanh. Where <code>z &asymp; 0</code>, the gradient passes through unchanged. Gates add a path around the multiplication.</div>
+          <details><summary>Backward, paper form (given <code>dh'</code>)</summary>
+            <pre>dh̃ = dh' &odot; z        dz = dh' &odot; (h̃ - h)      dh = dh' &odot; (1 - z)
+da_h̃ = dh̃ &odot; (1 - h̃²)   da_z = dz &odot; z(1 - z)
+d(r&odot;h) = da_h̃ Uᵀ     dr = d(r&odot;h) &odot; h      dh += d(r&odot;h) &odot; r
+da_r = dr &odot; r(1 - r)
+dh += da_z U_zᵀ + da_r U_rᵀ
+dx  = da_z W_zᵀ + da_r W_rᵀ + da_h̃ Wᵀ     (same pattern with C_* for dc)
+dW_* = xᵀ da_*   dU_z = hᵀ da_z   dU_r = hᵀ da_r   dU = (r&odot;h)ᵀ da_h̃</pre>
+          </details>
+        </div>
+        <div class="card warn">
+          <h3>PyTorch's <code>nn.GRU</code> differs in two places</h3>
+          <p>It writes <code>h' = (1 - z) &odot; n + z &odot; h</code>, so <code>z</code> plays the opposite role. And its candidate applies <code>r</code> after the matmul: <code>n = tanh(x W_in + r &odot; (h W_hn + b_hn))</code>. Gates are packed as <code>(r, z, n)</code>.</p>
+          <p class="small muted">These are the traps we hit when cross-checking the masked-loop encoder against packed <code>nn.GRU</code>. Our decoder uses <code>nn.GRUCell</code> on the input <code>[E y ; c]</code>, so this is the form to dry-run for our model.</p>
+          <pre>r  = &sigma;(x W_ir + b_ir + h W_hr + b_hr)
+z  = &sigma;(x W_iz + b_iz + h W_hz + b_hz)
+n  = tanh(x W_in + b_in + r &odot; (h W_hn + b_hn))
+h' = (1 - z) &odot; n + z &odot; h</pre>
+          <details><summary>Backward, PyTorch form (given <code>dh'</code>)</summary>
+            <pre>dn = dh' &odot; (1 - z)     dz = dh' &odot; (h - n)     dh = dh' &odot; z
+da_n = dn &odot; (1 - n²)    da_z = dz &odot; z(1 - z)
+dr = da_n &odot; (h W_hn + b_hn)     da_r = dr &odot; r(1 - r)
+d(h W_hn) = da_n &odot; r
+dh += d(h W_hn) W_hnᵀ + da_z W_hzᵀ + da_r W_hrᵀ
+dx  = da_n W_inᵀ + da_z W_izᵀ + da_r W_irᵀ
+dW_i* = xᵀ da_*    dW_hn = hᵀ (da_n &odot; r)    dW_hz = hᵀ da_z    dW_hr = hᵀ da_r</pre>
+          </details>
+          <details><summary>Hand check: H = D = 1, every weight 1, biases 0, x = 1, h = 0.5, dh' = 1</summary>
+            <pre>r = z = &sigma;(1.5) = 0.8176     n = tanh(1 + 0.8176&middot;0.5) = 0.8872
+h' = 0.1824&middot;0.8872 + 0.8176&middot;0.5 = 0.5706
+dn = 0.1824   dz = 0.5 - 0.8872 = -0.3872
+da_n = 0.0388   da_z = -0.0578   dr = 0.0194   da_r = 0.0029
+dh = 0.8176 + 0.0388&middot;0.8176 - 0.0578 + 0.0029 = 0.7945
+dx = 0.0388 - 0.0578 + 0.0029 = -0.0160</pre>
+            <p class="small muted"><code>dh</code> is dominated by the direct <code>z</code> path (0.8176); all the gated paths together add only -0.0231. That is the gate's shortcut.</p>
+          </details>
+        </div>
+      </div>
+    </section>
+
+    <!-- M5. BAHDANAU STEP -->
+    <section role="tabpanel" id="m-attn" aria-labelledby="t-m-attn" hidden>
+      <div class="lead">
+        <div class="eyebrow">Mechanics &middot; one full decoder step</div>
+        <h2>Bahdanau attention, forward and backward with shapes</h2>
+        <p>Our RNNsearch decoder step <code>i</code>, following <code>train_bahdanau.py</code>: attention projections <code>W_a</code>, <code>U_a</code>, <code>v_a</code> are <code>nn.Linear</code> with biases, the decoder cell is <code>nn.GRUCell</code> (PyTorch form in M4), and keys are computed once per batch, before the step loop.</p>
+      </div>
+      <div class="card">
+        <h3>Forward</h3>
+        <pre class="flow">h_bwd_1 (B,H) --bridge, tanh--&gt; s_0 (B,H)  [once per batch]
+H_enc (B,T,2H) --U_a--&gt; K (B,T,A)        [once per batch]
+s_(i-1) (B,H) --W_a--&gt; q (B,A) --unsqueeze--&gt; (B,1,A)
+q + K (broadcast) --tanh--&gt; P (B,T,A) --v_a--&gt; e (B,T) --mask, softmax over T--&gt; &alpha; (B,T)
+&alpha; , H_enc --bmm--&gt; c_i (B,2H)
+[E y_(i-1) ; c_i] (B, D+2H) + s_(i-1) --GRU--&gt; s_i (B,H)
+[E y_(i-1) ; s_i ; c_i] (B, D+H+2H) --fc_out--&gt; (B,2l) --maxout--&gt; (B,l) --W_o--&gt; logits (B,V)</pre>
+      </div>
+      <div class="card">
+        <h3>Backward of the attention part (given <code>dc_i</code>, shape <code>(B, 2H)</code>)</h3>
+        <div class="scroll"><table class="eq">
+          <thead><tr><th>gradient</th><th>equation</th><th>shape</th></tr></thead>
+          <tbody>
+            <tr><td><code>dH_enc</code> (value path)</td><td><code>+= &alpha;.unsqueeze(2) * dc.unsqueeze(1)</code></td><td><code>(B, T, 2H)</code></td></tr>
+            <tr><td><code>d&alpha;</code></td><td><code>d&alpha;_j = h_j &middot; dc</code>, i.e. <code>bmm(H_enc, dc.unsqueeze(2)).squeeze(2)</code></td><td><code>(B, T)</code></td></tr>
+            <tr><td><code>de</code></td><td><code>&alpha; &odot; (d&alpha; - &Sigma;_j &alpha;_j d&alpha;_j)</code> (softmax Jacobian; pads have &alpha; = 0, so de = 0)</td><td><code>(B, T)</code></td></tr>
+            <tr><td><code>dv_a</code></td><td><code>&Sigma;_(b,j) de_bj P_bj</code></td><td><code>(A,)</code></td></tr>
+            <tr><td><code>dpre</code></td><td><code>(de.unsqueeze(2) * v_a) &odot; (1 - P²)</code></td><td><code>(B, T, A)</code></td></tr>
+            <tr><td><code>dq</code></td><td><code>dpre.sum(dim=1)</code> (broadcast rule)</td><td><code>(B, A)</code></td></tr>
+            <tr><td>biases</td><td><code>dv_a bias = de.sum()</code>, <code>dW_a bias = dq.sum(0)</code>, <code>dU_a bias = dK.sum((0, 1))</code></td><td>scalar, <code>(A,)</code>, <code>(A,)</code></td></tr>
+            <tr><td><code>dW_a</code>, <code>ds_(i-1)</code></td><td><code>s_(i-1)ᵀ dq</code>, <code>+= dq W_aᵀ</code></td><td><code>(H, A)</code>, <code>(B, H)</code></td></tr>
+            <tr><td><code>dK</code> &rarr; <code>dU_a</code>, <code>dH_enc</code> (key path)</td><td><code>dK = dpre</code>; <code>dU_a = &Sigma;_b H_encᵀ dK</code>; <code>dH_enc += dK U_aᵀ</code></td><td><code>(2H, A)</code>, <code>(B, T, 2H)</code></td></tr>
+          </tbody>
+        </table></div>
+        <div class="notice"><b>Notice</b><code>H_enc</code> gets gradient through two paths (key and value) at every decoder step, and all of it is summed, because the same <code>H_enc</code> and <code>K</code> are reused at every step. <code>c_i</code> and <code>E y_(i-1)</code> also get two gradients each, from the GRU input and from the deep output.</div>
+        <details><summary>Hand check: T = 2, scalar values h = [1, 3], scores e = [0, 0], dc = 1</summary>
+          <pre>&alpha; = [0.5, 0.5]        c = 0.5&middot;1 + 0.5&middot;3 = 2
+d&alpha; = [h_1&middot;dc, h_2&middot;dc] = [1, 3]
+&Sigma; &alpha;_j d&alpha;_j = 2
+de = [0.5&middot;(1-2), 0.5&middot;(3-2)] = [-0.5, 0.5]
+dh (value path) = &alpha; &middot; dc = [0.5, 0.5]</pre>
+          <p class="small muted">Read it: the score of the larger value is pushed up, the smaller one down, by the same amount.</p>
+        </details>
+      </div>
+      <div class="card">
+        <h3>Where <code>dc_i</code>, <code>ds_i</code> and <code>dE</code> come from: the deep output backward</h3>
+        <div class="scroll"><table class="eq">
+          <thead><tr><th>gradient, in order</th><th>equation</th><th>shape</th></tr></thead>
+          <tbody>
+            <tr><td><code>do_i</code></td><td><code>(p - onehot(y_i)) / N</code>, rows with a PAD target are 0 (M2)</td><td><code>(B, V)</code></td></tr>
+            <tr><td><code>dW_o</code>, <code>dt</code></td><td><code>tᵀ do_i</code>, <code>do_i W_oᵀ</code></td><td><code>(l, V)</code>, <code>(B, l)</code></td></tr>
+            <tr><td><code>dt̃</code></td><td>maxout routing: each <code>dt</code> entry goes to the winner of its pair</td><td><code>(B, 2l)</code></td></tr>
+            <tr><td><code>dW_fc</code>, <code>dcomb</code></td><td><code>combᵀ dt̃</code>, <code>dt̃ W_fcᵀ</code> with <code>comb = [E y_(i-1) ; s_i ; c_i]</code></td><td><code>(D+3H, 2l)</code>, <code>(B, D+3H)</code></td></tr>
+            <tr><td>split</td><td><code>dcomb</code> &rarr; <code>dE</code> <code>(B, D)</code> | <code>ds_i</code> <code>(B, H)</code> | <code>dc_i</code> <code>(B, 2H)</code></td><td></td></tr>
+            <tr><td><code>ds_i</code> total</td><td>deep-output part + <code>dh</code> from step i+1's GRU + <code>dq W_aᵀ</code> from step i+1's attention</td><td><code>(B, H)</code></td></tr>
+            <tr><td>GRU backward</td><td>PyTorch form (M4) with <code>dh' = ds_i</code> gives <code>ds_(i-1)</code> (GRU part) and <code>dx</code> for <code>x = [E y_(i-1) ; c_i]</code></td><td><code>(B, D+2H)</code></td></tr>
+            <tr><td><code>dc_i</code> total</td><td>deep-output part + the last <code>2H</code> entries of the GRU's <code>dx</code>; then into attention (table above)</td><td><code>(B, 2H)</code></td></tr>
+            <tr><td><code>dE</code> total</td><td>deep-output part + the first <code>D</code> entries of the GRU's <code>dx</code>; scatter-add into the target embedding at <code>y_(i-1)</code></td><td><code>(B, D)</code></td></tr>
+            <tr><td>after step 1</td><td><code>ds_0</code> &rarr; <code>d(bridge)</code> through <code>tanh</code> &rarr; <code>dh_bwd_1</code> (encoder backward RNN's final state)</td><td><code>(B, H)</code></td></tr>
+          </tbody>
+        </table></div>
+        <div class="notice"><b>Notice</b>Backward runs the steps in reverse, i = T_out down to 1, exactly like BPTT: <code>ds_i</code> collects gradient from its own output and from everything at step i+1. <code>dH_enc</code>, <code>dU_a</code> and the attention biases are summed over all steps.</div>
+      </div>
+      <div class="card">
+        <h3>Encoder side: from <code>dH_enc</code> back to the source embedding</h3>
+        <div class="scroll"><table class="eq">
+          <tbody>
+            <tr><td>split</td><td><code>dH_enc (B, T, 2H)</code> &rarr; forward half <code>[..., :H]</code> and backward half <code>[..., H:]</code></td></tr>
+            <tr><td>final states</td><td>add <code>dh_bwd_1</code> from the bridge to the backward RNN's state at position 1</td></tr>
+            <tr><td>forward RNN</td><td>BPTT from t = T down to 1, as in M4 (GRU form)</td></tr>
+            <tr><td>backward RNN</td><td>BPTT in the opposite order, t = 1 up to T, because it read the sentence right to left</td></tr>
+            <tr><td>embedding</td><td>both directions' <code>dx_t</code> add up (fan-out), then scatter-add into the source embedding</td></tr>
+            <tr><td>padding</td><td>packed sequences give pad positions no gradient; <code>padding_idx=PAD</code> keeps <code>dC[PAD] = 0</code></td></tr>
+          </tbody>
+        </table></div>
+      </div>
+    </section>
+
+    <!-- M6. NORMALIZATION -->
+    <section role="tabpanel" id="m-norm" aria-labelledby="t-m-norm" hidden>
+      <div class="lead">
+        <div class="eyebrow">Mechanics &middot; normalization</div>
+        <h2>LayerNorm forward and backward, and why the scale cancels</h2>
+        <p>LayerNorm takes statistics over the features of one example (each row). BatchNorm uses the same formulas over the batch (each column).</p>
+      </div>
+      <div class="card">
+        <div class="scroll"><table class="eq">
+          <thead><tr><th>forward</th><th>equation</th><th>shape</th></tr></thead>
+          <tbody>
+            <tr><td>mean, variance</td><td><code>&mu; = mean_H(x)</code>, <code>var = mean_H((x - &mu;)²)</code>, with <code>keepdim</code></td><td><code>(B, 1)</code></td></tr>
+            <tr><td>normalize</td><td><code>std = &radic;(var + &epsilon;)</code>, <code>x̂ = (x - &mu;) / std</code></td><td><code>(B, 1)</code>, <code>(B, H)</code></td></tr>
+            <tr><td>scale, shift</td><td><code>y = x̂ &odot; g + b</code>, with <code>g, b</code> of shape <code>(H,)</code></td><td><code>(B, H)</code></td></tr>
+          </tbody>
+          <thead><tr><th>backward</th><th>equation</th><th>shape</th></tr></thead>
+          <tbody>
+            <tr><td><code>dg</code>, <code>db</code></td><td><code>(dy &odot; x̂).sum(0)</code>, <code>dy.sum(0)</code></td><td><code>(H,)</code></td></tr>
+            <tr><td><code>dx̂</code></td><td><code>dy &odot; g</code></td><td><code>(B, H)</code></td></tr>
+            <tr><td><code>dx</code></td><td><code>(1/std) &middot; (dx̂ - mean_H(dx̂) - x̂ &odot; mean_H(dx̂ &odot; x̂))</code>, each <code>mean_H</code> of shape <code>(B, 1)</code></td><td><code>(B, H)</code></td></tr>
+          </tbody>
+        </table></div>
+        <div class="notice"><b>Notice</b>Each row of <code>dx</code> sums to 0 and is orthogonal to <code>x̂</code>, so the gradient never changes the mean or the overall scale of the input. Scaling <code>x</code> by &lambda; leaves <code>x̂</code> the same and divides <code>dx</code> by &lambda;. That <code>1/std</code> is why our gradient stayed at 2.868e-11 at every weight scale.</div>
+        <details><summary>Hand check: x = [1, 2, 6], g = 1, b = 0, &epsilon; = 0, dy = [1, 0, 0]</summary>
+          <pre>&mu; = 3     var = (4 + 1 + 9) / 3 = 4.6667     std = 2.1602
+x̂  = [-0.9258, -0.4629, 1.3887]
+dx = [0.1763, -0.2204, 0.0441]    (sum 0, dx&middot;x̂ = 0)
+x &times; 10 -&gt; same x̂, dx = [0.0176, -0.0220, 0.0044]</pre>
+          <p class="small muted">Edge case: with H = 2 and &epsilon; = 0, x̂ is always [-1, 1] or [1, -1], so dx = 0. LayerNorm needs enough features to be useful.</p>
+        </details>
+      </div>
+      <div class="grid2">
+        <div class="card">
+          <h3>BatchNorm, the same formulas over the other axis</h3>
+          <p><code>&mu;, std</code> per feature over the batch, shape <code>(1, H)</code>; running averages are kept for test time. In the backward, <code>mean_B</code> replaces <code>mean_H</code>, so example 1's gradient depends on example 2's values.</p>
+        </div>
+        <div class="card">
+          <h3>What each one is invariant to</h3>
+          <p><strong>Both</strong> are invariant to scaling the whole weight matrix. <strong>LayerNorm</strong> is also invariant to scaling one training example, but not to scaling one neuron's weight vector. <strong>BatchNorm</strong> is the opposite on those two. (Ba et al. 2016, Table 1.)</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- M7. DECODING + METRICS -->
+    <section role="tabpanel" id="m-decode" aria-labelledby="t-m-decode" hidden>
+      <div class="lead">
+        <div class="eyebrow">Mechanics &middot; algorithms around the model</div>
+        <h2>Greedy, beam search, BPE and BLEU, step by step</h2>
+        <p>None of these have gradients, but each one changed our numbers. These are the versions in our notebooks.</p>
+      </div>
+      <div class="grid2">
+        <div class="card">
+          <h3>Greedy decode</h3>
+          <pre>y = [SOS] * B ; finished = [False] * B
+for step in range(max_len):
+    logits, s = decoder(y, s, ...)
+    y = argmax(logits)            # (B,)
+    y[finished] = PAD
+    finished |= (y == EOS)
+    if all(finished): break
+# then cut each row at its first EOS</pre>
+        </div>
+        <div class="card">
+          <h3>Beam search, batched (our version)</h3>
+          <pre>repeat encoder outputs K times     # row b*K + k
+scores = [0, -inf, ..., -inf] per sentence
+for step in range(max_len):
+    logp = log_softmax(decoder(...))       # (B*K, V)
+    logp[finished] = -inf ; logp[finished, PAD] = 0
+    cand = (scores + logp).view(B, K*V)
+    scores, idx = cand.topk(K)
+    parent, token = idx // V, idx % V
+    reorder s, history, finished by parent
+    if all finished: break
+best = argmax(scores / lengths)</pre>
+        </div>
+        <div class="card">
+          <h3>BPE, learn and apply</h3>
+          <pre>learn:  words as chars + &lt;/w&gt;, weighted by count
+        repeat N times: merge the most frequent
+        adjacent pair, record it
+apply:  rank = {pair: position in merge list}
+        repeat: among the word's pairs, merge the
+        one with the lowest rank; stop when none
+        of its pairs has a rank</pre>
+          <p class="small muted">Worked example and Table 1 are in the BPE artifact.</p>
+        </div>
+        <div class="card">
+          <h3>BLEU</h3>
+          <pre>p_n  = clipped n-gram matches / n-grams in output
+BP   = 1 if c &gt; r else exp(1 - r / c)
+BLEU = BP &middot; exp( (1/4) &Sigma;_(n=1..4) log p_n )</pre>
+          <details><summary>Hand check: word greedy, p = 42.2 / 19.4 / 10.7 / 6.1 %, BP = 1</summary>
+            <pre>(0.422 &middot; 0.194 &middot; 0.107 &middot; 0.061)^(1/4) = 0.152
+BLEU &asymp; 15.2   (reported 15.23 from unrounded p_n)</pre>
+          </details>
+          <div class="notice"><b>Notice</b>BLEU is a geometric mean: a weak 4-gram precision pulls the whole score down. Clipping stops an output from scoring by repeating one matching word.</div>
+        </div>
+      </div>
+    </section>
+
+  </div>
+</main>
+
+<footer>
+  <div class="wrap">Genesis lab &middot; built from the project KB and our notebooks, 2026-11-21 &middot; next: <em>Attention Is All You Need</em> (Vaswani et al. 2017).</div>
+</footer>
+
+<script>
+(function () {
+  var tabs = Array.prototype.slice.call(document.querySelectorAll('[role="tab"]'));
+  var panels = Array.prototype.slice.call(document.querySelectorAll('[role="tabpanel"]'));
+  var groups = Array.prototype.slice.call(document.querySelectorAll('.grp'));
+  function tabFor(id) { return tabs.filter(function (t) { return t.getAttribute('aria-controls') === id; })[0]; }
+  function show(id, focus) {
+    var tab = tabFor(id);
+    if (!tab) { tab = tabs[0]; id = tab.getAttribute('aria-controls'); }
+    var group = tab.getAttribute('data-group');
+    panels.forEach(function (p) { p.hidden = p.id !== id; });
+    groups.forEach(function (g) { g.setAttribute('aria-pressed', g.getAttribute('data-group') === group ? 'true' : 'false'); });
+    tabs.forEach(function (t) {
+      var on = t === tab;
+      t.hidden = t.getAttribute('data-group') !== group;
+      t.setAttribute('aria-selected', on ? 'true' : 'false');
+      t.tabIndex = on ? 0 : -1;
+      if (on && focus) t.focus();
+    });
+    try { tab.scrollIntoView({ block: 'nearest', inline: 'nearest' }); } catch (e) {}
+  }
+  function go(id) {
+    if (location.hash !== '#' + id) { location.hash = id; } else { show(id); }
+    window.scrollTo(0, 0);
+  }
+  groups.forEach(function (g) {
+    g.addEventListener('click', function () {
+      var first = tabs.filter(function (t) { return t.getAttribute('data-group') === g.getAttribute('data-group'); })[0];
+      go(first.getAttribute('aria-controls'));
+    });
+  });
+  tabs.forEach(function (t) {
+    t.addEventListener('click', function () { go(t.getAttribute('aria-controls')); });
+    t.addEventListener('keydown', function (e) {
+      var d = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0;
+      if (!d) return;
+      var same = tabs.filter(function (x) { return x.getAttribute('data-group') === t.getAttribute('data-group'); });
+      var i = same.indexOf(t);
+      var next = same[(i + d + same.length) % same.length];
+      location.hash = next.getAttribute('aria-controls');
+      next.focus();
+    });
+  });
+  window.addEventListener('hashchange', function () { show(location.hash.slice(1)); });
+  show(location.hash.slice(1));
+})();
+</script>

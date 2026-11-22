@@ -1,0 +1,554 @@
+<title>Backprop Playbook</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+  /* Layout: single 760px reading column, numbered sections, mono for every symbol and number. Genesis Lab house style. */
+  :root {
+    --paper: #f5f6f2;
+    --paper-raised: #ffffff;
+    --ink: #1c222b;
+    --ink-soft: #565f6b;
+    --ink-faint: #8a919b;
+    --accent: #2a4494;
+    --accent-soft: #e8ebf7;
+    --accent-line: #c4cdea;
+    --highlight: #93641a;
+    --highlight-soft: #f3e6cd;
+    --rule: #dcded5;
+    --code-bg: #eef0ea;
+    --good: #2f6b46;
+    --good-soft: #dfeee6;
+    --serif: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif;
+    --mono: ui-monospace, "SF Mono", "Cascadia Code", "JetBrains Mono", Menlo, Consolas, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper: #14171c;
+      --paper-raised: #1a1e25;
+      --ink: #e7e9e4;
+      --ink-soft: #a3aab3;
+      --ink-faint: #6b7280;
+      --accent: #8ba0e8;
+      --accent-soft: #212a44;
+      --accent-line: #364373;
+      --highlight: #d9a857;
+      --highlight-soft: #332913;
+      --rule: #2a2e36;
+      --code-bg: #1e222a;
+      --good: #6fb891;
+      --good-soft: #16301f;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper: #14171c;
+    --paper-raised: #1a1e25;
+    --ink: #e7e9e4;
+    --ink-soft: #a3aab3;
+    --ink-faint: #6b7280;
+    --accent: #8ba0e8;
+    --accent-soft: #212a44;
+    --accent-line: #364373;
+    --highlight: #d9a857;
+    --highlight-soft: #332913;
+    --rule: #2a2e36;
+    --code-bg: #1e222a;
+    --good: #6fb891;
+    --good-soft: #16301f;
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--sans);
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+
+  .page {
+    max-width: 760px;
+    margin: 0 auto;
+    padding-block: 56px 96px;
+    padding-left: max(20px, env(safe-area-inset-left, 0px));
+    padding-right: max(20px, env(safe-area-inset-right, 0px));
+  }
+
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--accent);
+    font-weight: 600;
+  }
+  h1 {
+    font-family: var(--serif);
+    font-size: 34px;
+    font-weight: 600;
+    margin: 8px 0 6px;
+    text-wrap: balance;
+    letter-spacing: -0.01em;
+  }
+  .dek { color: var(--ink-soft); font-size: 15.5px; max-width: 60ch; margin: 0 0 22px; }
+  .status {
+    display: inline-block;
+    margin: 0 0 20px;
+    padding: 5px 9px;
+    border-radius: 4px;
+    background: var(--highlight-soft);
+    color: var(--highlight);
+    font: 600 10.5px var(--mono);
+    letter-spacing: .07em;
+    text-transform: uppercase;
+  }
+
+  nav.toc {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 18px;
+    padding: 14px 0;
+    border-top: 1px solid var(--rule);
+    border-bottom: 1px solid var(--rule);
+    margin-bottom: 40px;
+  }
+  nav.toc a {
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: 0.03em;
+    color: var(--ink-soft);
+    text-decoration: none;
+    border-bottom: 1px solid transparent;
+  }
+  nav.toc a:hover, nav.toc a:focus-visible { color: var(--accent); border-bottom-color: var(--accent-line); }
+  nav.toc a:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+  section { margin-bottom: 52px; scroll-margin-top: 20px; }
+  .section-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 18px; }
+  .section-num { font-family: var(--mono); font-size: 12px; color: var(--ink-faint); }
+  h2 { font-family: var(--serif); font-size: 21px; font-weight: 600; margin: 0; text-wrap: balance; }
+  h3 {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    font-weight: 600;
+    margin: 30px 0 12px;
+  }
+  .section-note { color: var(--ink-soft); font-size: 14px; margin: -10px 0 18px; max-width: 62ch; }
+  p.body-text { color: var(--ink); font-size: 14.5px; max-width: 62ch; margin: 0 0 14px; }
+  ul.points { margin: 0 0 14px; padding-left: 20px; font-size: 14.5px; max-width: 62ch; }
+  ul.points li { margin-bottom: 6px; }
+  code, .sym { font-family: var(--mono); font-size: 0.93em; color: var(--ink); }
+
+  /* rule callout: the one line to remember */
+  .rule-box {
+    background: var(--good-soft);
+    border-left: 3px solid var(--good);
+    border-radius: 4px;
+    padding: 16px 20px;
+    margin: 0 0 16px;
+  }
+  .rule-box .r-title {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--good);
+    font-weight: 600;
+    margin-bottom: 6px;
+  }
+  .rule-box p { margin: 0; font-family: var(--serif); font-size: 17px; line-height: 1.45; color: var(--ink); }
+  .rule-box p + p { margin-top: 6px; }
+
+  .formula-box {
+    background: var(--accent-soft);
+    border-left: 3px solid var(--accent);
+    border-radius: 4px;
+    padding: 18px 22px;
+    margin: 0 0 16px;
+  }
+  .f-title {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--accent);
+    font-weight: 600;
+    margin-bottom: 10px;
+  }
+  .f-comment { color: var(--ink-soft); font-size: 13px; margin-top: 8px; }
+
+  .warn {
+    background: var(--highlight-soft);
+    border-left: 3px solid var(--highlight);
+    border-radius: 4px;
+    padding: 16px 20px;
+    margin: 16px 0 0;
+    font-size: 13.5px;
+    color: var(--ink-soft);
+  }
+  .warn strong { color: var(--ink); }
+  .warn .w-title {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--highlight);
+    font-weight: 600;
+    display: block;
+    margin-bottom: 7px;
+  }
+  .warn ul { margin: 0; padding-left: 18px; }
+  .warn li { margin-bottom: 5px; }
+
+  /* worked numbers */
+  pre.calc {
+    font-family: var(--mono);
+    font-variant-numeric: tabular-nums;
+    font-size: 13px;
+    line-height: 1.7;
+    background: var(--code-bg);
+    color: var(--ink);
+    border-radius: 6px;
+    padding: 14px 16px;
+    margin: 0 0 14px;
+    overflow-x: auto;
+  }
+  pre.calc .dim { color: var(--ink-faint); }
+  pre.calc .hl { color: var(--accent); font-weight: 600; }
+  .formula-box pre.calc { background: transparent; padding: 0; margin: 0; font-size: 14px; }
+
+  .tbl-wrap { overflow-x: auto; border: 1px solid var(--rule); border-radius: 6px; margin-bottom: 14px; }
+  table { border-collapse: collapse; width: 100%; font-size: 13.5px; }
+  thead th {
+    text-align: left;
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    background: var(--paper-raised);
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--rule);
+    white-space: nowrap;
+  }
+  tbody td {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--rule);
+    vertical-align: top;
+    color: var(--ink-soft);
+    background: var(--paper-raised);
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  td.sym { white-space: nowrap; color: var(--ink); }
+  td.shape { font-family: var(--mono); color: var(--accent); font-weight: 600; white-space: nowrap; }
+  td.num, th.num { font-family: var(--mono); font-variant-numeric: tabular-nums; text-align: right; color: var(--ink); white-space: nowrap; }
+  table.grid { width: auto; min-width: 280px; }
+  table.grid td, table.grid th { text-align: center; font-family: var(--mono); }
+  table.grid td.rowhead { text-align: left; color: var(--ink-faint); font-size: 12px; }
+  table.grid td.zero { color: var(--ink-faint); }
+  table.grid td.cell { color: var(--ink); }
+
+  .two-col { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-bottom: 14px; }
+  .mini-card { min-width: 0; border: 1px solid var(--rule); background: var(--paper-raised); border-radius: 6px; padding: 16px; }
+  .mini-card h3 { margin-top: 0; }
+  .mini-card svg { display: block; width: 100%; height: auto; }
+  .mini-card .cap { font-size: 12.5px; color: var(--ink-soft); margin: 10px 0 0; }
+  @media (max-width: 560px) { .two-col { grid-template-columns: minmax(0, 1fr); } h1 { font-size: 28px; } }
+
+  .wire { stroke: var(--accent-line); stroke-width: 1.5; fill: none; }
+  .wire.zero { stroke-dasharray: 3 4; }
+  .wire.back { stroke: var(--highlight); }
+  .node { fill: var(--paper); stroke: var(--ink-soft); stroke-width: 1.2; }
+  .svg-t { font-family: var(--mono); font-size: 11px; fill: var(--ink); }
+  .svg-w { font-family: var(--mono); font-size: 9.5px; fill: var(--ink-faint); }
+
+  .step-list { display: grid; gap: 0; }
+  .step { display: grid; grid-template-columns: 32px minmax(0, 1fr); gap: 12px; padding: 0 0 14px; }
+  .step-no { color: var(--accent); font: 600 12px var(--mono); padding-top: 2px; }
+  .step p { margin: 0; font-size: 13.5px; color: var(--ink-soft); }
+  .step strong { color: var(--ink); }
+  .tag {
+    display: inline-block;
+    font-family: var(--mono);
+    font-size: 10.5px;
+    padding: 2px 7px;
+    border-radius: 4px;
+    background: var(--highlight-soft);
+    color: var(--highlight);
+    font-weight: 600;
+    margin-left: 6px;
+    vertical-align: middle;
+  }
+  .tag.ok { background: var(--good-soft); color: var(--good); }
+
+  footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid var(--rule); font-size: 12.5px; color: var(--ink-faint); }
+</style>
+
+<div class="page">
+  <div class="eyebrow">Genesis Lab · Foundations</div>
+  <h1>Backprop Playbook</h1>
+  <p class="dek">How to walk gradients and their shapes through a network by hand. Every rule here was checked with a nudge of 0.1 on real numbers before it was written down.</p>
+  <div class="status">Steps 1-3 done · deep chain, init, norms pending</div>
+  <nav class="toc" aria-label="Section index">
+    <a href="#ground">Ground rules</a><a href="#linear">Linear layer</a><a href="#example">Worked example</a><a href="#fanout">Fan-out</a><a href="#act">Activations</a><a href="#two">Two multipliers</a><a href="#slips">Slips</a><a href="#next">Next</a>
+  </nav>
+
+  <section id="ground">
+    <div class="section-head"><span class="section-num">01</span><h2>Ground rules</h2></div>
+    <p class="section-note">Three things that stay fixed for every layer in every network.</p>
+    <div class="step-list">
+      <div class="step"><div class="step-no">01</div><p><strong>A gradient has the shape of its variable.</strong> <code>L</code> is a scalar, so <code>dX</code> (meaning <code>∂L/∂X</code>) always has exactly the shape of <code>X</code>.</p></div>
+      <div class="step"><div class="step-no">02</div><p><strong>Each layer has one local job.</strong> It receives <code>dY</code> from above and turns it into the gradient of its own weights and the gradient of its own input. It never needs to know what the loss is.</p></div>
+      <div class="step"><div class="step-no">03</div><p><strong>The nudge is the definition.</strong> Change one number by <code>0.1</code>, redo the forward pass, and divide the change in <code>L</code> by <code>0.1</code>. Every formula below is a shortcut for that.</p></div>
+    </div>
+    <div class="formula-box"><div class="f-title">Where dy comes from</div>
+<pre class="calc">L = y1 - y2          dy = [1, -1]     the coefficients of y in L
+L = 3*y1 - y2        dy = [3, -1]</pre>
+      <div class="f-comment">A different loss gives a different <code>dy</code>. The layer's job stays the same.</div>
+    </div>
+  </section>
+
+  <section id="linear">
+    <div class="section-head"><span class="section-num">02</span><h2>Linear layer</h2></div>
+    <div class="rule-box">
+      <div class="r-title">Rule to remember</div>
+      <p>The gradient of a wire is the value at its input times the error at its output.</p>
+      <p>The gradient of an input is the errors travelling back along the same wires.</p>
+    </div>
+    <p class="body-text"><code>W_kj</code> is the wire from input <code>k</code> to output <code>j</code>. Row = which input it leaves, column = which output it enters. That is why <code>W</code> has shape <code>(D_in, D_out)</code>.</p>
+    <div class="two-col">
+      <div class="mini-card">
+        <h3>Forward: outputs collect</h3>
+        <svg viewBox="0 0 300 170" role="img" aria-label="Three inputs connected to two outputs by six wires, forward direction">
+          <line class="wire" x1="62" y1="35" x2="238" y2="60"/><line class="wire zero" x1="62" y1="35" x2="238" y2="115"/>
+          <line class="wire" x1="62" y1="85" x2="238" y2="60"/><line class="wire" x1="62" y1="85" x2="238" y2="115"/>
+          <line class="wire zero" x1="62" y1="135" x2="238" y2="60"/><line class="wire" x1="62" y1="135" x2="238" y2="115"/>
+          <circle class="node" cx="50" cy="35" r="12"/><circle class="node" cx="50" cy="85" r="12"/><circle class="node" cx="50" cy="135" r="12"/>
+          <circle class="node" cx="250" cy="60" r="12"/><circle class="node" cx="250" cy="115" r="12"/>
+          <text class="svg-t" x="50" y="39" text-anchor="middle">x1</text><text class="svg-t" x="50" y="89" text-anchor="middle">x2</text><text class="svg-t" x="50" y="139" text-anchor="middle">x3</text>
+          <text class="svg-t" x="250" y="64" text-anchor="middle">y1</text><text class="svg-t" x="250" y="119" text-anchor="middle">y2</text>
+          <text class="svg-w" x="150" y="20" text-anchor="middle">6 wires = W, shape (3, 2)</text>
+          <text class="svg-w" x="150" y="162" text-anchor="middle">dashed = weight 0 in the example</text>
+        </svg>
+        <p class="cap">Each output reads its <strong>column</strong> of <code>W</code>: <code>y_j = Σ_k x_k W_kj</code></p>
+      </div>
+      <div class="mini-card">
+        <h3>Backward: inputs collect</h3>
+        <svg viewBox="0 0 300 170" role="img" aria-label="The same six wires carrying errors from two outputs back to three inputs">
+          <line class="wire back" x1="62" y1="35" x2="238" y2="60"/><line class="wire back zero" x1="62" y1="35" x2="238" y2="115"/>
+          <line class="wire back" x1="62" y1="85" x2="238" y2="60"/><line class="wire back" x1="62" y1="85" x2="238" y2="115"/>
+          <line class="wire back zero" x1="62" y1="135" x2="238" y2="60"/><line class="wire back" x1="62" y1="135" x2="238" y2="115"/>
+          <circle class="node" cx="50" cy="35" r="13"/><circle class="node" cx="50" cy="85" r="13"/><circle class="node" cx="50" cy="135" r="13"/>
+          <circle class="node" cx="250" cy="60" r="13"/><circle class="node" cx="250" cy="115" r="13"/>
+          <text class="svg-t" x="50" y="39" text-anchor="middle">dx1</text><text class="svg-t" x="50" y="89" text-anchor="middle">dx2</text><text class="svg-t" x="50" y="139" text-anchor="middle">dx3</text>
+          <text class="svg-t" x="250" y="64" text-anchor="middle">dy1</text><text class="svg-t" x="250" y="119" text-anchor="middle">dy2</text>
+          <text class="svg-w" x="150" y="20" text-anchor="middle">same wires, reverse direction</text>
+        </svg>
+        <p class="cap">Each input reads its <strong>row</strong> of <code>W</code>: <code>dx_k = Σ_j W_kj dy_j</code></p>
+      </div>
+    </div>
+    <div class="formula-box"><div class="f-title">Playbook card · Y = XW + b</div>
+<pre class="calc">X: (B, D_in)    W: (D_in, D_out)    b: (D_out)    Y, dY: (B, D_out)
+
+<span class="hl">dW = Xᵀ dY</span>        (D_in, D_out)   input value × output error, summed over the batch
+<span class="hl">dX = dY Wᵀ</span>        (B, D_in)       own row of wires × errors, no sum over the batch
+<span class="hl">db = dY.sum(0)</span>    (D_out)         just dy, summed over the batch</pre>
+      <div class="f-comment">The transposes are how the picture is written as a matrix product. <code>Xᵀ</code> lines up one feature across all examples so the batch sum can happen. <code>Wᵀ</code> reads rows where the forward pass read columns.</div>
+    </div>
+    <div class="tbl-wrap"><table><thead><tr><th>What appears in</th><th>Contains</th><th>Consequence</th></tr></thead><tbody>
+      <tr><td class="sym">dW</td><td class="shape">x</td><td>An input that is zero teaches its wires nothing on that example.</td></tr>
+      <tr><td class="sym">dX</td><td class="shape">W</td><td>The gradient going back is scaled by the weights. It does not depend on <code>x</code>.</td></tr>
+      <tr><td class="sym">db</td><td class="shape">dy only</td><td>No input multiplies the bias, so nothing scales its error.</td></tr>
+    </tbody></table></div>
+    <div class="warn"><span class="w-title">Shape matching is a check, not the reason</span>For a square layer (<code>D_in == D_out</code>) both <code>dY W</code> and <code>dY Wᵀ</code> have a valid shape, so shapes cannot pick the order. The wire picture can.</div>
+  </section>
+
+  <section id="example">
+    <div class="section-head"><span class="section-num">03</span><h2>Worked example</h2></div>
+    <p class="section-note">One layer, 3 inputs, 2 outputs, loss <code>L = y1 - y2</code>. Every number below can be recomputed by hand.</p>
+
+    <h3>Setup and forward</h3>
+    <div class="tbl-wrap"><table class="grid"><thead><tr><th></th><th>y1</th><th>y2</th></tr></thead><tbody>
+      <tr><td class="rowhead">x1 = 1</td><td class="cell">W_11 = 1</td><td class="zero">W_12 = 0</td></tr>
+      <tr><td class="rowhead">x2 = 2</td><td class="cell">W_21 = 2</td><td class="cell">W_22 = 1</td></tr>
+      <tr><td class="rowhead">x3 = 3</td><td class="zero">W_31 = 0</td><td class="cell">W_32 = -1</td></tr>
+    </tbody></table></div>
+<pre class="calc">y1 = 1*1 + 2*2 + 3*0    =  5
+y2 = 1*0 + 2*1 + 3*(-1) = -1
+L  = 5 - (-1)           =  6          dy = [1, -1]</pre>
+
+    <h3>One wire by nudging</h3>
+<pre class="calc"><span class="dim">W_21: 2 -> 2.1</span>
+y1 = 1*1 + 2*2.1 + 3*0 = 5.2      <span class="dim">y1 +0.2, scaled by x2 = 2</span>
+L  = 5.2 - (-1)        = 6.2      <span class="dim">L  +0.2, scaled by dy1 = 1</span>
+<span class="hl">dW_21 = 0.2 / 0.1 = 2 = x2 * dy1</span>
+
+<span class="dim">W_32: -1 -> -0.9</span>
+y2 = 0 + 2 + 3*(-0.9)  = -0.7     L = 5.7
+<span class="hl">dW_32 = -0.3 / 0.1 = -3 = x3 * dy2</span></pre>
+
+    <h3>Full dW: row's x times column's dy</h3>
+    <div class="tbl-wrap"><table class="grid"><thead><tr><th></th><th>dy1 = 1</th><th>dy2 = -1</th></tr></thead><tbody>
+      <tr><td class="rowhead">x1 = 1</td><td class="cell">1</td><td class="cell">-1</td></tr>
+      <tr><td class="rowhead">x2 = 2</td><td class="cell">2</td><td class="cell">-2</td></tr>
+      <tr><td class="rowhead">x3 = 3</td><td class="cell">3</td><td class="cell">-3</td></tr>
+    </tbody></table></div>
+    <p class="body-text">This grid is the outer product <code>xᵀ dy</code>, shape <code>(3,1)(1,2) -> (3,2)</code>. <code>W_31</code> is <code>0</code> but <code>dW_31 = 3</code>: the gradient of a wire depends on its two ends, not on its own value.</p>
+
+    <h3>One input by nudging</h3>
+<pre class="calc"><span class="dim">x2: 2 -> 2.1    (x2 feeds both outputs)</span>
+y1 = 1 + 2.1*2 + 0 =  5.2         <span class="dim">+0.2 via W_21 = 2</span>
+y2 = 0 + 2.1*1 - 3 = -0.9         <span class="dim">+0.1 via W_22 = 1</span>
+L  = 5.2 - (-0.9)  =  6.1
+<span class="hl">dx2 = 0.1 / 0.1 = 1 = W_21*dy1 + W_22*dy2 = 2 - 1</span>
+
+<span class="dim">x3: 3 -> 3.1    (x back at [1, 2, 3.1])</span>
+y1 = 1 + 4 + 3.1*0 = 5            <span class="dim">unchanged, W_31 = 0</span>
+y2 = 0 + 2 - 3.1   = -1.1         L = 6.1
+<span class="hl">dx3 = 1 = 0*1 + (-1)*(-1)</span></pre>
+<pre class="calc">dx = dy Wᵀ = [1, 1, 1]            <span class="dim">all ones is a coincidence of these numbers</span>
+dy = [1, 0]  ->  dx = [1, 2, 0]   <span class="dim">column 1 of W: only the y1 wires carry error</span></pre>
+
+    <h3>Batch of 2</h3>
+<pre class="calc">X = [ 1  2  3 ]      dY = [ 1  -1 ]      <span class="dim">L = sum over both examples of (y1 - y2)</span>
+    [ 0  1  1 ]           [ 1  -1 ]
+
+example 1 grid     example 2 grid     dW = Xᵀ dY
+[ 1  -1 ]          [ 0   0 ]          [ 1  -1 ]
+[ 2  -2 ]     +    [ 1  -1 ]     =    [ 3  -3 ]
+[ 3  -3 ]          [ 1  -1 ]          [ 4  -4 ]
+
+dX = dY Wᵀ = [ 1  1  1 ]              <span class="dim">one row per example, no sum</span>
+             [ 1  1  1 ]
+
+db = dY.sum(0) = [2, -2]              <span class="dim">b1 +0.1 moves y1 in both examples, L +0.2</span></pre>
+  </section>
+
+  <section id="fanout">
+    <div class="section-head"><span class="section-num">04</span><h2>Fan-out rule</h2></div>
+    <div class="rule-box">
+      <div class="r-title">Rule to remember</div>
+      <p>Whatever is used in N places going forward gets the sum of N gradients coming back.</p>
+    </div>
+    <div class="tbl-wrap"><table><thead><tr><th>Forward</th><th>Backward</th><th>Formula</th></tr></thead><tbody>
+      <tr><td class="sym">copy: x goes to many places</td><td class="shape">sum</td><td class="sym">dx = dA + dB + ...</td></tr>
+      <tr><td class="sym">sum: s = Σ x_i</td><td class="shape">copy</td><td class="sym">dx_i = ds</td></tr>
+      <tr><td class="sym">mean: m = Σ x_i / N</td><td class="shape">copy / N</td><td class="sym">dx_i = dm / N</td></tr>
+    </tbody></table></div>
+    <p class="body-text">Broadcasting is a copy. The bias is broadcast to <code>B</code> rows, so <code>db = dY.sum(0)</code>. No extra averaging: if the loss is a batch mean, the <code>1/B</code> is already inside <code>dY</code>.</p>
+    <p class="body-text">Already seen three times in the worked example: <code>dx2</code> summed over 2 outputs, <code>dW</code> summed over 2 examples, <code>db1</code> summed over 2 examples.</p>
+
+    <h3>Two paths: one direct, one through an operation</h3>
+<pre class="calc">x = 2      a = 3*x = 6      y = x + a = 8      L = y
+
+<span class="dim">x: 2 -> 2.1</span>
+a = 6.3    y = 2.1 + 6.3 = 8.4               <span class="dim">L +0.4</span>
+
+direct path     x +0.1 -> y +0.1             grad 1
+path through a  x +0.1 -> a +0.3 -> y +0.3   grad 3
+<span class="hl">dx = 1 + 3 = 4</span>
+
+a = 0.001*x  ->  dx = 1.001                  <span class="dim">the direct path alone still gives 1</span></pre>
+
+    <h3>Sum and mean</h3>
+<pre class="calc">x = [1, 2, 3]
+
+s = 6      L = 5*s      ds = 5      <span class="hl">dx = [5, 5, 5]</span>
+m = 2      L = 5*m      dm = 5      <span class="hl">dx = [5/3, 5/3, 5/3]</span></pre>
+    <div class="warn"><span class="w-title">Carry forward</span><ul>
+      <li>A <strong>direct add path</strong> (<code>y = x + a</code>) always contributes gradient <code>1</code>, however weak the other path is.</li>
+      <li>A <strong>mean</strong> touches every element with weight <code>1/N</code>. BatchNorm and LayerNorm backward are built from this.</li>
+    </ul></div>
+  </section>
+
+  <section id="act">
+    <div class="section-head"><span class="section-num">05</span><h2>Activations</h2></div>
+    <div class="rule-box">
+      <div class="r-title">Rule to remember</div>
+      <p>Gradient from above times the slope of the curve at that point.</p>
+    </div>
+    <div class="formula-box"><div class="f-title">Playbook card · A = f(Z)</div>
+<pre class="calc">Z, A: (B, D)
+
+<span class="hl">dZ = dA * f'(Z)</span>       (B, D)     elementwise, no sum, no transpose</pre>
+      <div class="f-comment">Each <code>z_i</code> feeds only its own <code>a_i</code>. No mixing, so nothing to sum and nothing to transpose.</div>
+    </div>
+
+    <h3>ReLU: a gate that is 0 or 1</h3>
+<pre class="calc">z  = [2, -1, 0.5]        a = [2, 0, 0.5]
+L  = 1*a1 + 2*a2 + 3*a3 = 3.5         da = [1, 2, 3]
+
+z1: 2   -> 2.1     L 3.5 -> 3.6       dz1 = 1     <span class="dim">gate open, da passes</span>
+z2: -1  -> -0.9    L unchanged        dz2 = 0     <span class="dim">gate shut, da2 = 2 is dropped</span>
+z3: 0.5 -> 0.6     L 3.5 -> 3.8       dz3 = 3
+
+<span class="hl">dz = da * (z > 0) = [1, 0, 3]</span></pre>
+
+    <h3>tanh: a gate that depends on z</h3>
+    <div class="tbl-wrap"><table><thead><tr><th class="num">z</th><th class="num">tanh(z)</th><th class="num">tanh(z + 0.1)</th><th class="num">slope by nudge</th><th class="num">1 - a²</th></tr></thead><tbody>
+      <tr><td class="num">0</td><td class="num">0.0000</td><td class="num">0.0997</td><td class="num">1.00</td><td class="num">1.000</td></tr>
+      <tr><td class="num">2</td><td class="num">0.9640</td><td class="num">0.9705</td><td class="num">0.065</td><td class="num">0.071</td></tr>
+      <tr><td class="num">4</td><td class="num">0.99933</td><td class="num">0.99945</td><td class="num">0.0012</td><td class="num">0.0013</td></tr>
+    </tbody></table></div>
+    <p class="body-text">At <code>z = 4</code> the output is already at <code>0.999</code> with nowhere left to go, so the curve is flat and almost nothing passes. That is saturation. The nudge slope and the exact slope differ slightly because <code>0.1</code> is not a small nudge.</p>
+
+    <h3>Slopes</h3>
+    <div class="tbl-wrap"><table><thead><tr><th>Activation</th><th>f'(z)</th><th class="num">Max</th><th>Behaviour</th></tr></thead><tbody>
+      <tr><td class="sym">ReLU</td><td class="sym">1 if z &gt; 0 else 0</td><td class="num">1</td><td>Passes everything or nothing. Never shrinks, but can switch off.</td></tr>
+      <tr><td class="sym">tanh</td><td class="sym">1 - a²</td><td class="num">1</td><td>Can only shrink. Near zero when <code>|z|</code> is large.</td></tr>
+      <tr><td class="sym">sigmoid</td><td class="sym">a (1 - a)</td><td class="num">0.25</td><td>Shrinks by at least 4x, even in the best case.</td></tr>
+    </tbody></table></div>
+  </section>
+
+  <section id="two">
+    <div class="section-head"><span class="section-num">06</span><h2>The two multipliers</h2></div>
+    <p class="section-note">Where vanishing and exploding gradients come from. This is the bridge to the next step.</p>
+    <p class="body-text">Going back through one layer, the gradient is multiplied by two things:</p>
+    <div class="tbl-wrap"><table><thead><tr><th>Multiplier</th><th>From</th><th>Can do</th></tr></thead><tbody>
+      <tr><td class="sym">f'(z)</td><td>Activation, section 05</td><td>Only shrink (tanh, sigmoid) or gate (ReLU)</td></tr>
+      <tr><td class="sym">Wᵀ</td><td>Linear layer, section 02</td><td>Shrink or grow</td></tr>
+    </tbody></table></div>
+<pre class="calc">10 sigmoids in a row, best case (every z = 0):
+
+0.25^10 ≈ 0.00000095            <span class="dim">about a million times smaller, before W is counted</span></pre>
+    <p class="body-text">Vanishing or exploding is decided by the product of these two, repeated once per layer.</p>
+  </section>
+
+  <section id="slips">
+    <div class="section-head"><span class="section-num">07</span><h2>Slips to watch</h2></div>
+    <p class="section-note">Mistakes actually made while working through this, and the fix for each.</p>
+    <div class="step-list">
+      <div class="step"><div class="step-no">01</div><p><strong><code>dY/dW</code> is <code>X</code>, not <code>W</code>.</strong> For <code>Y = XW</code> the derivative with respect to <code>W</code> brings out <code>X</code>. The scalar chain rule tells you which things multiply; the wire picture tells you the order and the transpose.</p></div>
+      <div class="step"><div class="step-no">02</div><p><strong>Wire gradient uses <code>x</code>, input gradient uses <code>W</code>.</strong> <code>dW_32 = x3 * dy2 = -3</code> is not <code>dx3</code>. A wire's change is scaled by its input; an input's change is scaled by its wires.</p></div>
+      <div class="step"><div class="step-no">03</div><p><strong>Reset before every nudge.</strong> Each nudge starts from the original numbers. Carrying <code>x2 = 2.1</code> into the <code>x3</code> nudge gave <code>y1 = 5.2</code> where it should have stayed <code>5</code>.</p></div>
+      <div class="step"><div class="step-no">04</div><p><strong>Check the sign against the nudge.</strong> If <code>L</code> went up when the variable went up, the gradient is positive. Redo the forward pass line by line when the two disagree.</p></div>
+      <div class="step"><div class="step-no">05</div><p><strong>A variable can appear more than once.</strong> In <code>y = x + a</code> with <code>a = 3x</code>, both the direct <code>x</code> and the <code>a</code> change when <code>x</code> is nudged.</p></div>
+    </div>
+  </section>
+
+  <section id="next">
+    <div class="section-head"><span class="section-num">08</span><h2>Next</h2></div>
+    <div class="tbl-wrap"><table><thead><tr><th>Step</th><th>Topic</th><th>Status</th></tr></thead><tbody>
+      <tr><td class="sym">1</td><td>Shape rule and the linear layer</td><td><span class="tag ok">done</span></td></tr>
+      <tr><td class="sym">2</td><td>Fan-out: copy, sum, mean</td><td><span class="tag ok">done</span></td></tr>
+      <tr><td class="sym">3</td><td>Elementwise activations</td><td><span class="tag ok">done</span></td></tr>
+      <tr><td class="sym">4</td><td>Softmax + cross-entropy</td><td><span class="tag">pending</span></td></tr>
+      <tr><td class="sym">5</td><td>Deep chain: repeated <code>Wᵀ</code> and <code>f'</code>, vanishing and exploding</td><td><span class="tag">pending</span></td></tr>
+      <tr><td class="sym">6</td><td>Initialisation as variance preservation</td><td><span class="tag">pending</span></td></tr>
+      <tr><td class="sym">7</td><td>RNN and backprop through time</td><td><span class="tag">pending</span></td></tr>
+      <tr><td class="sym">8</td><td>BatchNorm forward and backward</td><td><span class="tag">pending</span></td></tr>
+      <tr><td class="sym">9</td><td>LayerNorm forward and backward</td><td><span class="tag">pending</span></td></tr>
+      <tr><td class="sym">10</td><td>Other network types</td><td><span class="tag">pending</span></td></tr>
+    </tbody></table></div>
+  </section>
+
+  <footer>Built from a hand-worked session on 2026-11-14 and 2026-11-15. Every number on this page was computed by nudging, then matched against the rule. Sections are added as each step closes.</footer>
+</div>
