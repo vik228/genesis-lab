@@ -141,7 +141,9 @@ def load_hf_wmt14_data(n_sample=N_SAMPLE):
         CACHE_DIR, f"tok_n{n_sample}_len{MAX_LEN}_seed{DATA_SEED}.pt"
     )
     if os.path.exists(cache_path):
-        data = torch.load(cache_path)
+        # our own cache of plain lists; the default weights_only=True unpickler
+        # peaks above 10 GB on the 2M cache and gets OOM-killed on Colab (12 GB)
+        data = torch.load(cache_path, weights_only=False)
         print("loaded cache:", cache_path)
     else:
         data = {}
